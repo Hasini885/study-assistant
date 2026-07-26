@@ -177,7 +177,26 @@ return a specific kind of broken response:
 
 ## Layout
 
-A full-viewport app shell rather than a centred column:
+### Landing
+
+The app opens on a full-screen landing page: **STUDY ASSISTANT** set as full-bleed display type,
+with the letters rising in on a stagger and index cards drifting behind them.
+
+- The wordmark is sized in `vw` so it always fills the screen, clamped at both ends — the upper
+  bound is what stops "ASSISTANT" (nine characters) running off the side of a wide monitor.
+- Letters are individual spans so each can carry its own `animation-delay`, which breaks the text
+  up for assistive tech — so the `<h1>` carries an `aria-label` and the letter spans are hidden
+  from the accessibility tree.
+- **Enter** or **Space** starts, so you never have to reach for the mouse.
+- If you have saved sessions, a secondary action offers to resume the most recent one directly,
+  skipping the prompt entirely.
+
+The landing owns the whole viewport, so it replaces the shell rather than rendering inside it —
+but it returns *after* every hook, so app state and any in-flight request survive.
+
+### App shell
+
+A full-viewport shell rather than a centred column:
 
 ```
 ┌────────────────────────────────────────────────┐

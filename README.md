@@ -242,6 +242,10 @@ I also used AI for CSS scaffolding. Every file here is one I can walk through an
   ones you'd marked known.
 - **Single-provider.** Only Groq. The provider call is isolated in `server/groq.js`, so swapping it
   is a contained change, but there's no abstraction layer.
+- **Groq's free tier rate-limits quickly.** Generating and then immediately refining a set can
+  trip a 429 — refinement sends the whole set back, so it's a token-heavy request. The app
+  surfaces this as a clear "Rate limit reached, wait a few seconds" error with a Retry button
+  rather than a generic failure, but the limit itself is real. Waiting a few seconds fixes it.
 - **No rate limiting or auth on the API.** Fine for local use, not for deployment.
 - **20,000 character input cap**, and long notes can still hit the model's context limit — that
   returns a clear "input too long" error rather than failing mysteriously.

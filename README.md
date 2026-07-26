@@ -187,9 +187,24 @@ with the letters rising in on a stagger and index cards drifting behind them.
 - Letters are individual spans so each can carry its own `animation-delay`, which breaks the text
   up for assistive tech — so the `<h1>` carries an `aria-label` and the letter spans are hidden
   from the accessibility tree.
+- **Pointer parallax** — two planes moving opposite ways off one pointer position: the card layer
+  leads, the wordmark counter-moves by less. `usePointerParallax` coalesces updates into one rAF
+  per frame however fast the mouse moves, and opts out entirely on coarse pointers, where there
+  is no hover to track.
+- **A rotating topic** in the lede cycles through example subjects, each one blurring and rising
+  into place.
+- **A ticker** along the bottom scrolls the feature list. The list is rendered twice so
+  `translateX(-50%)` lands exactly on the seam, and both ends are masked so items fade in and out
+  rather than popping at the edge.
+- **A scatter exit** — starting the app throws the cards off-screen and lifts the wordmark away
+  before handing over. Skipped entirely under reduced motion, which takes the direct path.
 - **Enter** or **Space** starts, so you never have to reach for the mouse.
 - If you have saved sessions, a secondary action offers to resume the most recent one directly,
   skipping the prompt entirely.
+
+All parallax and float motion uses `translate` as an individual property rather than the
+`transform` shorthand, so the pointer parallax composes with each card's own float animation
+instead of overwriting it.
 
 The landing owns the whole viewport, so it replaces the shell rather than rendering inside it —
 but it returns *after* every hook, so app state and any in-flight request survive.
@@ -270,6 +285,9 @@ is rather than defaulting to generic dashboard chrome.
 - **A physical stack** — up to two ghost cards sit behind the live one, rotated and offset. They
   thin out as you advance, so "how much is left" is legible without reading the counter.
 - **Ruled answer side** — the back face is lined like something handwritten on an index card.
+- **Rubber stamps** — marking a card *Got it* or *Review later* slams a rotated, outlined
+  MASTERED / REVIEW stamp onto the corner. Purely decorative, so it's `aria-hidden`: the status is
+  already conveyed by the buttons underneath.
 - **Editorial serif for content** — card fronts, quiz questions and titles use a system serif
   stack (`Iowan Old Style` → `Palatino` → `Georgia`). Chrome stays sans-serif, so study material
   is typographically distinct from UI. No web font, so no extra request.

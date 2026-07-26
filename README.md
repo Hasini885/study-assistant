@@ -239,6 +239,40 @@ doesn't exist.
 - Dark / light / system theme, native fullscreen toggle, keyboard navigation (←/→, 1–9, Space,
   Enter), mobile layout, `prefers-reduced-motion` support.
 
+## Visual identity
+
+The art direction is **index cards on a desk**, chosen because it matches what the app actually
+is rather than defaulting to generic dashboard chrome.
+
+- **Warm paper, not flat white** — cards and tiles sit on a `--paper` token mixed from the
+  surface colour, with fine grain over the top. The grain is desaturated *inside* the SVG with
+  `feColorMatrix` rather than with `mix-blend-mode`, because a blend mode creates a stacking
+  context and that can defeat `backface-visibility` on the flip, showing both faces at once.
+- **A physical stack** — up to two ghost cards sit behind the live one, rotated and offset. They
+  thin out as you advance, so "how much is left" is legible without reading the counter.
+- **Ruled answer side** — the back face is lined like something handwritten on an index card.
+- **Editorial serif for content** — card fronts, quiz questions and titles use a system serif
+  stack (`Iowan Old Style` → `Palatino` → `Georgia`). Chrome stays sans-serif, so study material
+  is typographically distinct from UI. No web font, so no extra request.
+- **Highlighter swash** under the set title, drawn as a background gradient with
+  `box-decoration-break: clone` so it wraps correctly across lines.
+- **Inline SVG hero illustration** that inherits the current accent and theme.
+
+### Per-set colour identity
+
+Every study set derives its own accent hue from its title (`src/lib/hue.js`), applied as `--hue`
+on the app root so rings, tabs, highlights, ruled lines and the ambient backdrop all shift
+together. It's a stable hash, so reopening a saved session brings back the same colour and "the
+blue set" stays a usable way to think about it.
+
+Two details:
+
+- The green–yellow band (70–150°) is deliberately skipped. Those hues read as *correct* in this
+  UI, and an accent that looks like the right-answer colour would be actively confusing in a quiz.
+- `--hue` is registered with `@property` as a `<number>`, which makes it animatable — so moving
+  between sets sweeps the whole palette around the colour wheel instead of cutting. Browsers
+  without `@property` just get an instant change.
+
 ## Motion and visuals
 
 No animation library — everything is CSS keyframes plus one small rAF hook, which keeps the

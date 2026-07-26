@@ -158,6 +158,13 @@ export function Flashcards({ cards, statuses, onMark, index, onIndex }) {
                     <span className="card__text">{card.front}</span>
                     {card.hint && <span className="card__hint">Hint: {card.hint}</span>}
                     <span className="card__nudge">Click, or press Space, to flip</span>
+                    {/* Rubber stamp for marked cards — the status is already
+                        conveyed by the buttons below, so this is decorative. */}
+                    {status && (
+                      <span className={`card__stamp card__stamp--${status}`} aria-hidden="true">
+                        {status === 'known' ? 'Mastered' : 'Review'}
+                      </span>
+                    )}
                   </span>
                   <span className="card__face card__face--back">
                     <span className="card__tag">Answer</span>

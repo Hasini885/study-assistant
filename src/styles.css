@@ -1,5 +1,16 @@
 /* ---------------------------------------------------------------- tokens -- */
 
+/*
+  Registering --hue as a typed custom property makes it animatable, so moving
+  between study sets sweeps the whole accent around the colour wheel instead of
+  cutting. Unsupported browsers just get an instant change.
+*/
+@property --hue {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 245;
+}
+
 :root {
   --bg: #f4f6fa;
   --surface: #ffffff;
@@ -21,8 +32,17 @@
   --shadow: 0 1px 2px rgb(16 20 30 / 6%), 0 8px 24px rgb(16 20 30 / 6%);
   --shadow-lg: 0 2px 6px rgb(16 20 30 / 8%), 0 18px 48px rgb(16 20 30 / 10%);
   --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Editorial serif for the things you actually read and memorise, so study
+     content is typographically distinct from chrome. All system fonts — no
+     network request, and it degrades sensibly everywhere. */
+  --font-display: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Georgia, serif;
   --sidebar-w: 320px;
   --topbar-h: 62px;
+  --paper: color-mix(in srgb, var(--surface) 96%, #d8b57a);
+}
+
+:root[data-theme='dark'] {
+  --paper: color-mix(in srgb, var(--surface) 94%, #6a5330);
 }
 
 :root[data-theme='dark'] {
@@ -136,11 +156,30 @@ code {
   and workspace scroll independently. On narrow screens this unwinds into a
   normal document flow with the sidebar as an overlay drawer.
 */
+/*
+  Per-set accent. App.jsx sets --hue from the study set's title, so every set
+  carries its own colour through rings, tabs, highlights and the backdrop.
+  Declared on .app (not :root) so it outranks the base tokens; the dark
+  override needs the extra specificity to beat :root[data-theme='dark'].
+*/
+.app {
+  --accent: hsl(var(--hue, 245) 68% 54%);
+  --accent-soft: hsl(var(--hue, 245) 84% 95%);
+  --accent-text: #ffffff;
+}
+
+:root[data-theme='dark'] .app {
+  --accent: hsl(var(--hue, 245) 84% 76%);
+  --accent-soft: hsl(var(--hue, 245) 42% 17%);
+  --accent-text: hsl(var(--hue, 245) 65% 9%);
+}
+
 .app {
   height: 100dvh;
   display: grid;
   grid-template-rows: auto 1fr;
   overflow: hidden;
+  transition: --hue 0.7s ease;
 }
 
 .topbar {
@@ -1031,6 +1070,7 @@ kbd {
 }
 
 .deck__stage {
+  position: relative;
   touch-action: pan-y;
   cursor: grab;
   transform: translateX(var(--drag, 0)) rotate(var(--drag-turn, 0deg));
@@ -1924,6 +1964,143 @@ kbd {
   .prompt-form__actions .btn--primary {
     flex: 1;
   }
+}
+
+/* --------------------------------------------------------- art direction -- */
+
+/*
+  The visual metaphor is index cards on a desk: warm paper, a physical stack,
+  ruled lines on the written side, and serif type for the content you actually
+  read. Chrome stays sans-serif so study material is typographically distinct.
+*/
+
+.card__text,
+.quiz__question,
+.hero__title,
+.workspace__title,
+.tile__question,
+.results__title {
+  font-family: var(--font-display);
+  letter-spacing: -0.005em;
+}
+
+.card__text {
+  font-size: 1.42rem;
+  line-height: 1.4;
+}
+
+/* Cards sit on warm paper rather than flat white. */
+.card__face,
+.tile,
+.deck__ghost {
+  background: var(--paper);
+}
+
+/*
+  Fine grain, so the paper isn't a flat fill. The noise is desaturated inside
+  the SVG (feColorMatrix) rather than with mix-blend-mode: a blend mode creates
+  a stacking context, and that can defeat backface-visibility on the flip,
+  showing both faces at once.
+*/
+.card__face::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.11;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23g)'/%3E%3C/svg%3E");
+}
+
+:root[data-theme='dark'] .card__face::before {
+  opacity: 0.045;
+}
+
+/* The answer side is ruled, like something written on an index card. */
+.card__face--back {
+  background-color: color-mix(in srgb, var(--paper) 92%, var(--accent));
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 33px,
+    color-mix(in srgb, var(--accent) 24%, transparent) 33px,
+    color-mix(in srgb, var(--accent) 24%, transparent) 34px
+  );
+  background-position: 0 24px;
+}
+
+/* Ghost layers: the rest of the deck, peeking out behind the live card. */
+.deck__ghost {
+  position: absolute;
+  inset: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  pointer-events: none;
+}
+
+.deck__ghost--1 {
+  transform: rotate(1.6deg) scale(0.985) translateY(5px);
+  opacity: 0.75;
+}
+
+.deck__ghost--2 {
+  transform: rotate(-2.4deg) scale(0.97) translateY(10px);
+  opacity: 0.45;
+}
+
+/* Highlighter swash under the set title, drawn as a background gradient. */
+.workspace__title {
+  display: inline;
+  padding: 0 2px;
+  background-image: linear-gradient(
+    transparent 64%,
+    color-mix(in srgb, var(--accent) 30%, transparent) 0,
+    color-mix(in srgb, var(--accent) 30%, transparent) 94%,
+    transparent 0
+  );
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* Hero */
+.hero__intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.hero-art {
+  width: 132px;
+  height: 116px;
+  flex-shrink: 0;
+}
+
+.hero-art rect {
+  fill: var(--paper);
+  stroke: var(--border-strong);
+  stroke-width: 1.5;
+}
+
+.hero-art__front rect {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+}
+
+.hero-art line {
+  stroke: color-mix(in srgb, var(--accent) 55%, transparent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.hero-art__back {
+  opacity: 0.45;
+}
+
+.hero-art__mid {
+  opacity: 0.7;
 }
 
 /* ----------------------------------------------------------------- motion -- */

@@ -103,92 +103,127 @@ export function Flashcards({ cards, statuses, onMark, index, onIndex }) {
         </div>
       </div>
 
-      <div
-        className={`deck__stage ${dragging ? 'is-dragging' : ''}`}
-        style={{ '--drag': `${dragX}px`, '--drag-turn': `${dragX / 28}deg` }}
-        {...handlers}
-      >
-        <button
-          type="button"
-          className={`card ${flipped ? 'is-flipped' : ''} ${status ? `card--${status}` : ''}`}
-          onClick={() => {
-            // A drag that ends on the card would otherwise also fire a click.
-            if (wasDragged()) return;
-            setFlipped((v) => !v);
-          }}
-          aria-label={flipped ? 'Answer. Activate to see the question.' : 'Question. Activate to reveal the answer.'}
-        >
-          <span className="card__inner">
-            <span className="card__face card__face--front">
-              <span className="card__tag">Question</span>
-              <span className="card__text">{card.front}</span>
-              {card.hint && <span className="card__hint">Hint: {card.hint}</span>}
-              <span className="card__nudge">Click, or press Space, to flip</span>
-            </span>
-            <span className="card__face card__face--back">
-              <span className="card__tag">Answer</span>
-              <span className="card__text">{card.back}</span>
-            </span>
-          </span>
-        </button>
-      </div>
-
-      <p className="sr-only" aria-live="polite">
-        {flipped ? card.back : card.front}
-      </p>
-
-      <div className="deck__controls">
-        <button type="button" className="btn btn--icon" onClick={() => go(-1)} disabled={position === 0} aria-label="Previous card">
-          ←
-        </button>
-        <button type="button" className="btn btn--wide" onClick={() => setFlipped((v) => !v)}>
-          {flipped ? 'Show question' : 'Reveal answer'}
-        </button>
-        <button
-          type="button"
-          className="btn btn--icon"
-          onClick={() => go(1)}
-          disabled={position >= visible.length - 1}
-          aria-label="Next card"
-        >
-          →
-        </button>
-      </div>
-
-      <div className="deck__marks">
-        <button type="button" className={`btn btn--mark ${status === 'known' ? 'is-active' : ''}`} onClick={() => mark('known')}>
-          Got it <kbd>1</kbd>
-        </button>
-        <button
-          type="button"
-          className={`btn btn--mark btn--mark-review ${status === 'review' ? 'is-active' : ''}`}
-          onClick={() => mark('review')}
-        >
-          Review later <kbd>2</kbd>
-        </button>
-      </div>
-
-      {/* Jump bar: one tick per card, coloured by status. */}
-      <div className="jumpbar" role="group" aria-label="Jump to card">
-        {visible.map((i, n) => {
-          const tickStatus = statuses[cards[i].id];
-          return (
+      <div className="deck__layout">
+        <div className="deck__main">
+          <div
+            className={`deck__stage ${dragging ? 'is-dragging' : ''}`}
+            style={{ '--drag': `${dragX}px`, '--drag-turn': `${dragX / 28}deg` }}
+            {...handlers}
+          >
             <button
-              key={cards[i].id}
               type="button"
-              className={`jumpbar__tick ${n === position ? 'is-current' : ''} ${tickStatus ? `is-${tickStatus}` : ''}`}
+              className={`card ${flipped ? 'is-flipped' : ''} ${status ? `card--${status}` : ''}`}
               onClick={() => {
-                setFlipped(false);
-                onIndex(i);
+                // A drag that ends on the card would otherwise also fire a click.
+                if (wasDragged()) return;
+                setFlipped((v) => !v);
               }}
-              aria-label={`Go to card ${n + 1}`}
-              aria-current={n === position}
-            />
-          );
-        })}
-      </div>
+              aria-label={flipped ? 'Answer. Activate to see the question.' : 'Question. Activate to reveal the answer.'}
+            >
+              <span className="card__inner">
+                <span className="card__face card__face--front">
+                  <span className="card__tag">Question</span>
+                  <span className="card__text">{card.front}</span>
+                  {card.hint && <span className="card__hint">Hint: {card.hint}</span>}
+                  <span className="card__nudge">Click, or press Space, to flip</span>
+                </span>
+                <span className="card__face card__face--back">
+                  <span className="card__tag">Answer</span>
+                  <span className="card__text">{card.back}</span>
+                </span>
+              </span>
+            </button>
+          </div>
 
-      <p className="deck__hint">Swipe or drag the card sideways · ← → to move · 1 / 2 to mark</p>
+          <p className="sr-only" aria-live="polite">
+            {flipped ? card.back : card.front}
+          </p>
+
+          <div className="deck__controls">
+            <button type="button" className="btn btn--icon" onClick={() => go(-1)} disabled={position === 0} aria-label="Previous card">
+              ←
+            </button>
+            <button type="button" className="btn btn--wide" onClick={() => setFlipped((v) => !v)}>
+              {flipped ? 'Show question' : 'Reveal answer'}
+            </button>
+            <button
+              type="button"
+              className="btn btn--icon"
+              onClick={() => go(1)}
+              disabled={position >= visible.length - 1}
+              aria-label="Next card"
+            >
+              →
+            </button>
+          </div>
+
+          <div className="deck__marks">
+            <button type="button" className={`btn btn--mark ${status === 'known' ? 'is-active' : ''}`} onClick={() => mark('known')}>
+              Got it <kbd>1</kbd>
+            </button>
+            <button
+              type="button"
+              className={`btn btn--mark btn--mark-review ${status === 'review' ? 'is-active' : ''}`}
+              onClick={() => mark('review')}
+            >
+              Review later <kbd>2</kbd>
+            </button>
+          </div>
+
+          {/* Compact jump bar, for screens too narrow to justify the rail. */}
+          <div className="jumpbar" role="group" aria-label="Jump to card">
+            {visible.map((i, n) => {
+              const tickStatus = statuses[cards[i].id];
+              return (
+                <button
+                  key={cards[i].id}
+                  type="button"
+                  className={`jumpbar__tick ${n === position ? 'is-current' : ''} ${tickStatus ? `is-${tickStatus}` : ''}`}
+                  onClick={() => {
+                    setFlipped(false);
+                    onIndex(i);
+                  }}
+                  aria-label={`Go to card ${n + 1}`}
+                  aria-current={n === position}
+                />
+              );
+            })}
+          </div>
+
+          <p className="deck__hint">Swipe or drag the card sideways · ← → to move · 1 / 2 to mark</p>
+        </div>
+
+        {/*
+          Wide screens get a rail listing every card in the current view, so the
+          set as a whole stays visible while you drill one card. Hidden by CSS
+          below 1100px, where the jump bar covers the same ground in less space.
+        */}
+        <aside className="rail" aria-label="Cards in this deck">
+          <ol className="rail__list">
+            {visible.map((i, n) => {
+              const item = cards[i];
+              const itemStatus = statuses[item.id];
+              return (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    className={`rail__item ${n === position ? 'is-current' : ''}`}
+                    onClick={() => {
+                      setFlipped(false);
+                      onIndex(i);
+                    }}
+                    aria-current={n === position}
+                  >
+                    <span className="rail__num">{n + 1}</span>
+                    <span className="rail__text">{item.front}</span>
+                    <span className={`dot ${itemStatus ? `dot--${itemStatus}` : 'dot--unseen'}`} aria-hidden="true" />
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </aside>
+      </div>
     </div>
   );
 }

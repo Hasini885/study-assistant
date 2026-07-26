@@ -9,7 +9,12 @@
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const DEFAULT_MODEL = 'llama-3.3-70b-versatile';
-const REQUEST_TIMEOUT_MS = 30_000;
+
+// Per-call ceiling. A request can make two calls (one generate, one repair), so
+// this must stay comfortably under half the serverless function's maxDuration
+// — otherwise the platform kills the function and the user gets an opaque
+// gateway error instead of our "the model timed out" message.
+const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS) || 25_000;
 
 /** Errors we can describe to the user, as opposed to unexpected crashes. */
 export class UpstreamError extends Error {

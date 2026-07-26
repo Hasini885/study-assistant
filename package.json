@@ -4,6 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "description": "Paste notes, get AI-generated flashcards and a quiz you can actually study with.",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "concurrently -n server,client -c magenta,cyan \"npm:start:server\" \"npm:start:client\"",
     "dev": "npm start",

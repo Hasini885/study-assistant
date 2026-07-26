@@ -124,6 +124,17 @@ export function Flashcards({ cards, statuses, onMark, index, onIndex }) {
             {...handlers}
           >
             {/*
+              Ghost layers behind the active card, so the deck reads as a
+              physical stack. They thin out as you advance, which makes
+              "how much is left" legible without reading the counter.
+            */}
+            {[2, 1]
+              .filter((layer) => visible.length - position - 1 >= layer)
+              .map((layer) => (
+                <span key={layer} className={`deck__ghost deck__ghost--${layer}`} aria-hidden="true" />
+              ))}
+
+            {/*
               Keyed on the card so React remounts this wrapper on every move,
               which restarts the entrance animation. data-dir picks the side it
               flies in from, so movement reads as travel through the deck.

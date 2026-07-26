@@ -102,6 +102,29 @@ export function ErrorBanner({ error, onRetry, onDismiss }) {
   );
 }
 
+/**
+ * Decorative card stack for the hero. Inline SVG rather than an image so it
+ * inherits the current accent and theme colours and costs no extra request.
+ */
+export function HeroArt() {
+  return (
+    <svg className="hero-art" viewBox="0 0 132 116" role="presentation" focusable="false" aria-hidden="true">
+      <g className="hero-art__back">
+        <rect x="14" y="26" width="88" height="62" rx="8" transform="rotate(-9 58 57)" />
+      </g>
+      <g className="hero-art__mid">
+        <rect x="22" y="24" width="88" height="62" rx="8" transform="rotate(-3.5 66 55)" />
+      </g>
+      <g className="hero-art__front">
+        <rect x="30" y="22" width="88" height="62" rx="8" />
+        <line x1="43" y1="42" x2="92" y2="42" />
+        <line x1="43" y1="54" x2="105" y2="54" />
+        <line x1="43" y1="66" x2="79" y2="66" />
+      </g>
+    </svg>
+  );
+}
+
 const PERKS = [
   { icon: '🗂', title: 'Flip through cards', text: 'Swipe or drag, mark what you know, drill only what you flagged.' },
   { icon: '✎', title: 'Take the quiz', text: 'Multiple choice with instant feedback and an explanation each time.' },

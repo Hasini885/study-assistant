@@ -8,6 +8,7 @@ import { useStudyProgress } from './hooks/useStudyProgress.js';
 import { useFullscreen } from './hooks/useFullscreen.js';
 import { useTheme } from './hooks/useTheme.js';
 
+import { Landing } from './components/Landing.jsx';
 import { PromptForm } from './components/PromptForm.jsx';
 import { StudySetView } from './components/StudySetView.jsx';
 import { ProgressPanel } from './components/ProgressPanel.jsx';
@@ -32,6 +33,7 @@ export default function App() {
   const [saveState, setSaveState] = useState('idle');
   const [quizStats, setQuizStats] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [entered, setEntered] = useState(false);
 
   // Kept so "Regenerate" can re-run the original prompt after a refinement.
   const lastInputRef = useRef('');
@@ -114,6 +116,22 @@ export default function App() {
   // that happened while a set is loaded is a dismissible banner instead, so the
   // user never loses working material to a failed refinement.
   const fatalError = study.status === 'error' && study.error;
+
+  // The landing page owns the whole viewport, so it replaces the shell rather
+  // than rendering inside it. Every hook above still runs, so state (and any
+  // in-flight request) survives if we ever come back to it.
+  if (!entered) {
+    return (
+      <Landing
+        onEnter={() => setEntered(true)}
+        recentSession={sessions[0]}
+        onResume={(session) => {
+          handleLoadSession(session);
+          setEntered(true);
+        }}
+      />
+    );
+  }
 
   return (
     <div className="app" style={hue === null ? undefined : { '--hue': hue }}>

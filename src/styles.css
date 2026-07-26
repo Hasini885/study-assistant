@@ -200,7 +200,9 @@ code {
 .main {
   min-height: 0;
   overflow-y: auto;
-  padding: 24px 24px 56px;
+  /* Side padding grows with the viewport instead of a fixed content cap, so a
+     wide monitor gets more study surface rather than more empty margin. */
+  padding: 24px clamp(20px, 3.5vw, 56px) 56px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -409,8 +411,10 @@ kbd {
 
 /* -------------------------------------------------------------------- hero */
 
+/* The hero stays centred and measured: a textarea the width of a 4K monitor
+   would be worse, not better. Everything after generation fills the screen. */
 .hero {
-  max-width: 720px;
+  max-width: 860px;
   width: 100%;
   margin: 0 auto;
   display: flex;
@@ -583,9 +587,7 @@ kbd {
   flex-direction: column;
   gap: 14px;
   align-items: flex-start;
-  max-width: 880px;
   width: 100%;
-  margin: 0 auto;
 }
 
 .state--error {
@@ -753,9 +755,7 @@ kbd {
   padding: 12px 14px;
   font-size: 0.86rem;
   border: 1px solid transparent;
-  max-width: 880px;
   width: 100%;
-  margin: 0 auto;
 }
 
 .banner--warn {
@@ -791,9 +791,8 @@ kbd {
 /* --------------------------------------------------------------- workspace */
 
 .workspace {
-  max-width: 880px;
   width: 100%;
-  margin: 0 auto;
+  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -918,6 +917,85 @@ kbd {
   gap: 12px;
 }
 
+.deck__layout {
+  display: grid;
+  gap: 16px;
+  align-items: start;
+}
+
+.deck__main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Card rail — only earns its space on a wide screen. */
+.rail {
+  display: none;
+  background: var(--surface-2);
+  border-radius: var(--radius);
+  padding: 8px;
+}
+
+.rail__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: min(58vh, 560px);
+  overflow-y: auto;
+}
+
+.rail__item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font: inherit;
+  font-size: 0.82rem;
+  text-align: left;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 9px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.rail__item:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.rail__item.is-current {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.rail__item.is-current .rail__num {
+  color: inherit;
+  opacity: 0.85;
+}
+
+.rail__num {
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  min-width: 16px;
+}
+
+.rail__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .deck__stage {
   touch-action: pan-y;
   cursor: grab;
@@ -942,14 +1020,15 @@ kbd {
   cursor: pointer;
   perspective: 1600px;
   width: 100%;
-  min-height: 300px;
+  /* Grows with the viewport so a tall window gets a bigger card, not more gap. */
+  min-height: clamp(300px, 44vh, 480px);
 }
 
 .card__inner {
   position: relative;
   display: block;
   width: 100%;
-  min-height: 300px;
+  min-height: clamp(300px, 44vh, 480px);
   transform-style: preserve-3d;
   transition: transform 0.5s cubic-bezier(0.2, 0.7, 0.3, 1);
 }
@@ -1653,6 +1732,37 @@ kbd {
 .devtools__active {
   color: var(--warn);
   font-weight: 600;
+}
+
+/* ----------------------------------------------------------- wide screens -- */
+
+@media (min-width: 1000px) {
+  /* Two columns of answers once there is room. Four stacked options waste a
+     wide screen and push the feedback panel below the fold. */
+  .options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
+
+  .results__ring {
+    width: 96px;
+    height: 96px;
+  }
+}
+
+@media (min-width: 1100px) {
+  .deck__layout {
+    grid-template-columns: minmax(0, 1fr) clamp(240px, 22vw, 340px);
+  }
+
+  .rail {
+    display: block;
+  }
+
+  /* The rail supersedes the jump bar rather than duplicating it. */
+  .jumpbar {
+    display: none;
+  }
 }
 
 /* ------------------------------------------------------- responsive shell -- */

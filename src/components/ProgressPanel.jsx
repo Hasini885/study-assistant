@@ -1,3 +1,5 @@
+import { useAnimatedNumber } from '../hooks/useAnimatedNumber.js';
+
 /**
  * Live progress for the current set, shown in the sidebar.
  *
@@ -9,13 +11,21 @@ export function ProgressPanel({ counts, quizStats, onResetProgress }) {
   const done = counts.known + counts.review;
   const percent = counts.total ? Math.round((counts.known / counts.total) * 100) : 0;
 
+  // Sweeps the arc as you mark cards rather than snapping between values.
+  const shownPercent = useAnimatedNumber(percent, { duration: 500 });
+
   return (
     <section className="panel">
       <h2 className="panel__title">Progress</h2>
 
       <div className="panel__ring-row">
-        <div className="ring" style={{ '--pct': percent }} role="img" aria-label={`${percent} percent of cards marked known`}>
-          <span>{percent}%</span>
+        <div
+          className="ring"
+          style={{ '--pct': shownPercent }}
+          role="img"
+          aria-label={`${percent} percent of cards marked known`}
+        >
+          <span>{Math.round(shownPercent)}%</span>
         </div>
         <div className="panel__ring-note">
           <strong>

@@ -16,6 +16,8 @@ export function Flashcards({ cards, statuses, onMark, index, onIndex }) {
   const [order, setOrder] = useState(() => cards.map((_, i) => i));
   const [flipped, setFlipped] = useState(false);
   const [reviewOnly, setReviewOnly] = useState(false);
+  // Which way the next card should fly in from. Purely presentational.
+  const [direction, setDirection] = useState('next');
 
   const visible = useMemo(() => {
     const inRange = order.filter((i) => cards[i]);
@@ -32,10 +34,21 @@ export function Flashcards({ cards, statuses, onMark, index, onIndex }) {
     (delta) => {
       const next = position + delta;
       if (next < 0 || next >= visible.length) return;
+      setDirection(delta > 0 ? 'next' : 'prev');
       setFlipped(false);
       onIndex(visible[next]);
     },
     [position, visible, onIndex]
+  );
+
+  /** Jump straight to a card from the jump bar or the rail. */
+  const jumpTo = useCallback(
+    (cardArrayIndex, viewPosition) => {
+      setDirection(viewPosition >= position ? 'next' : 'prev');
+      setFlipped(false);
+      onIndex(cardArrayIndex);
+    },
+    [position, onIndex]
   );
 
   const mark = useCallback(
@@ -110,29 +123,38 @@ export function Flashcards({ cards, statuses, onMark, index, onIndex }) {
             style={{ '--drag': `${dragX}px`, '--drag-turn': `${dragX / 28}deg` }}
             {...handlers}
           >
-            <button
-              type="button"
-              className={`card ${flipped ? 'is-flipped' : ''} ${status ? `card--${status}` : ''}`}
-              onClick={() => {
-                // A drag that ends on the card would otherwise also fire a click.
-                if (wasDragged()) return;
-                setFlipped((v) => !v);
-              }}
-              aria-label={flipped ? 'Answer. Activate to see the question.' : 'Question. Activate to reveal the answer.'}
-            >
-              <span className="card__inner">
-                <span className="card__face card__face--front">
-                  <span className="card__tag">Question</span>
-                  <span className="card__text">{card.front}</span>
-                  {card.hint && <span className="card__hint">Hint: {card.hint}</span>}
-                  <span className="card__nudge">Click, or press Space, to flip</span>
+            {/*
+              Keyed on the card so React remounts this wrapper on every move,
+              which restarts the entrance animation. data-dir picks the side it
+              flies in from, so movement reads as travel through the deck.
+            */}
+            <div className="deck__slide" key={cardIndex} data-dir={direction}>
+              <button
+                type="button"
+                className={`card ${flipped ? 'is-flipped' : ''} ${status ? `card--${status}` : ''}`}
+                onClick={() => {
+                  // A drag that ends on the card would otherwise also fire a click.
+                  if (wasDragged()) return;
+                  setFlipped((v) => !v);
+                }}
+                aria-label={
+                  flipped ? 'Answer. Activate to see the question.' : 'Question. Activate to reveal the answer.'
+                }
+              >
+                <span className="card__inner">
+                  <span className="card__face card__face--front">
+                    <span className="card__tag">Question</span>
+                    <span className="card__text">{card.front}</span>
+                    {card.hint && <span className="card__hint">Hint: {card.hint}</span>}
+                    <span className="card__nudge">Click, or press Space, to flip</span>
+                  </span>
+                  <span className="card__face card__face--back">
+                    <span className="card__tag">Answer</span>
+                    <span className="card__text">{card.back}</span>
+                  </span>
                 </span>
-                <span className="card__face card__face--back">
-                  <span className="card__tag">Answer</span>
-                  <span className="card__text">{card.back}</span>
-                </span>
-              </span>
-            </button>
+              </button>
+            </div>
           </div>
 
           <p className="sr-only" aria-live="polite">
@@ -179,10 +201,7 @@ export function Flashcards({ cards, statuses, onMark, index, onIndex }) {
                   key={cards[i].id}
                   type="button"
                   className={`jumpbar__tick ${n === position ? 'is-current' : ''} ${tickStatus ? `is-${tickStatus}` : ''}`}
-                  onClick={() => {
-                    setFlipped(false);
-                    onIndex(i);
-                  }}
+                  onClick={() => jumpTo(i, n)}
                   aria-label={`Go to card ${n + 1}`}
                   aria-current={n === position}
                 />
@@ -208,11 +227,9 @@ export function Flashcards({ cards, statuses, onMark, index, onIndex }) {
                   <button
                     type="button"
                     className={`rail__item ${n === position ? 'is-current' : ''}`}
-                    onClick={() => {
-                      setFlipped(false);
-                      onIndex(i);
-                    }}
+                    onClick={() => jumpTo(i, n)}
                     aria-current={n === position}
+                    style={{ '--i': n }}
                   >
                     <span className="rail__num">{n + 1}</span>
                     <span className="rail__text">{item.front}</span>

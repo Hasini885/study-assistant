@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useReducer } from 'react';
+import { Confetti } from './Confetti.jsx';
+import { useAnimatedNumber } from '../hooks/useAnimatedNumber.js';
 
 /**
  * Multiple-choice quiz with immediate feedback and a re-test loop.
@@ -34,6 +36,8 @@ function init(questions) {
     selected: null,
     answers: {}, // questionId -> { chosen, correct }
     finished: false,
+    streak: 0,
+    bestStreak: 0,
   };
 }
 
@@ -44,12 +48,17 @@ function reducer(state, action) {
       const question = state.queue[state.index];
       if (!question || action.optionIndex >= question.options.length) return state;
 
+      const correct = action.optionIndex === question.answerIndex;
+      const streak = correct ? state.streak + 1 : 0;
+
       return {
         ...state,
         selected: action.optionIndex,
+        streak,
+        bestStreak: Math.max(state.bestStreak, streak),
         answers: {
           ...state.answers,
-          [question.id]: { chosen: action.optionIndex, correct: action.optionIndex === question.answerIndex },
+          [question.id]: { chosen: action.optionIndex, correct },
         },
       };
     }
@@ -76,6 +85,8 @@ function reducer(state, action) {
         selected: null,
         answers,
         finished: false,
+        streak: 0,
+        bestStreak: state.bestStreak, // a run survives across rounds
       };
     }
 
@@ -136,6 +147,7 @@ export function Quiz({ questions, onRoundComplete }) {
         round={state.round}
         correctCount={correctCount}
         wrongCount={wrongCount}
+        bestStreak={state.bestStreak}
         onRetestWrong={() => dispatch({ type: 'retestWrong' })}
         onRestart={() => dispatch({ type: 'restart', questions })}
       />
@@ -150,7 +162,14 @@ export function Quiz({ questions, onRoundComplete }) {
         <span>
           Question {state.index + 1} of {state.queue.length}
         </span>
-        {state.round > 1 && <span className="pill pill--round">Re-test · round {state.round}</span>}
+        <span className="quiz__badges">
+          {state.streak >= 2 && (
+            <span className="pill pill--streak" key={state.streak}>
+              <span aria-hidden="true">🔥</span> {state.streak} in a row
+            </span>
+          )}
+          {state.round > 1 && <span className="pill pill--round">Re-test · round {state.round}</span>}
+        </span>
       </div>
 
       <div className="progress">
@@ -159,7 +178,8 @@ export function Quiz({ questions, onRoundComplete }) {
 
       <h3 className="quiz__question">{question.question}</h3>
 
-      <ul className="options" role="radiogroup" aria-label="Answer options">
+      {/* Keyed per question so the staggered entrance replays each time. */}
+      <ul className="options" role="radiogroup" aria-label="Answer options" key={question.id}>
         {question.options.map((option, i) => {
           const isCorrect = i === question.answerIndex;
           const isChosen = state.selected === i;
@@ -174,6 +194,7 @@ export function Quiz({ questions, onRoundComplete }) {
                 className={`option ${revealed ? (isCorrect ? 'is-correct' : 'is-wrong') : ''} ${isChosen ? 'is-chosen' : ''}`}
                 onClick={() => dispatch({ type: 'select', optionIndex: i })}
                 disabled={answered}
+                style={{ '--i': i }}
               >
                 <kbd className="option__key">{i + 1}</kbd>
                 <span className="option__text">{option}</span>
@@ -206,27 +227,43 @@ export function Quiz({ questions, onRoundComplete }) {
   );
 }
 
-function QuizResults({ results, round, correctCount, wrongCount, onRetestWrong, onRestart }) {
+function QuizResults({ results, round, correctCount, wrongCount, bestStreak, onRetestWrong, onRestart }) {
   const total = results.length;
   const percent = total ? Math.round((correctCount / total) * 100) : 0;
+  const perfect = total > 0 && wrongCount === 0;
+
+  // The ring sweeps up to the score instead of snapping to it.
+  const shownPercent = useAnimatedNumber(percent);
 
   return (
     <div className="results">
+      <Confetti trigger={perfect} />
+
       <div className="results__score">
-        <div className="results__ring" style={{ '--pct': percent }} role="img" aria-label={`${percent} percent correct`}>
-          <span>{percent}%</span>
+        <div
+          className="results__ring"
+          style={{ '--pct': shownPercent }}
+          role="img"
+          aria-label={`${percent} percent correct`}
+        >
+          <span>{Math.round(shownPercent)}%</span>
         </div>
         <div>
           <h3 className="results__title">
             {correctCount} of {total} correct
           </h3>
           <p className="results__note">
-            {wrongCount === 0
+            {perfect
               ? round > 1
                 ? 'Cleared the re-test. Nicely done.'
                 : 'Perfect score — nothing to re-test.'
               : `Re-test the ${wrongCount} you missed to lock ${wrongCount === 1 ? 'it' : 'them'} in.`}
           </p>
+          {bestStreak >= 3 && (
+            <p className="results__streak">
+              <span aria-hidden="true">🔥</span> Best run: {bestStreak} in a row
+            </p>
+          )}
         </div>
       </div>
 
@@ -242,8 +279,12 @@ function QuizResults({ results, round, correctCount, wrongCount, onRetestWrong, 
       </div>
 
       <ol className="review-list">
-        {results.map(({ question, result }) => (
-          <li key={question.id} className={`review-item ${result?.correct ? 'is-correct' : 'is-wrong'}`}>
+        {results.map(({ question, result }, n) => (
+          <li
+            key={question.id}
+            className={`review-item ${result?.correct ? 'is-correct' : 'is-wrong'}`}
+            style={{ '--i': n }}
+          >
             <p className="review-item__question">{question.question}</p>
             {result && !result.correct && (
               <p className="review-item__line">

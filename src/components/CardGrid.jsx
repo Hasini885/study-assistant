@@ -79,12 +79,13 @@ export function CardGrid({ cards, statuses, onMark, onStudyCard }) {
         <p className="browse__empty">No cards in this filter yet.</p>
       ) : (
         <ul className="grid">
-          {shown.map(({ card, index }) => {
+          {shown.map(({ card, index }, n) => {
             const status = statuses[card.id];
             const isFlipped = flipped.has(card.id);
 
             return (
-              <li key={card.id} className={`tile ${status ? `tile--${status}` : ''}`}>
+              // --i drives a staggered entrance, so the grid cascades in.
+              <li key={card.id} className={`tile ${status ? `tile--${status}` : ''}`} style={{ '--i': n }}>
                 <button
                   type="button"
                   className="tile__face"

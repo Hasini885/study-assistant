@@ -72,7 +72,8 @@ free-form text
 | `shared/extractJson.js` | Tolerant JSON extraction (shared by server and client) |
 | `shared/normalize.js` | Shape repair, validation, `isValidStudySet` guard |
 | `src/hooks/useStudySet.js` | Request lifecycle, race protection, retry/cancel |
-| `src/components/` | Prompt form, flashcards, quiz, states, refinement |
+| `src/hooks/useStudyProgress.js` | Per-card known/review state, shared by three views |
+| `src/components/` | Prompt form, flashcards, browse grid, quiz, states, refinement |
 
 `shared/` is imported by both sides, so "what a valid study set is" is defined exactly once.
 
@@ -174,14 +175,44 @@ return a specific kind of broken response:
 
 ---
 
+## Layout
+
+A full-viewport app shell rather than a centred column:
+
+```
+┌────────────────────────────────────────────────┐
+│ topbar — brand, new set, theme                 │
+├──────────────┬─────────────────────────────────┤
+│ sidebar      │  workspace                      │
+│  new set     │   Flashcards │ Browse │ Quiz    │
+│  progress    │   …                             │
+│  sessions    │   refine bar                    │
+└──────────────┴─────────────────────────────────┘
+```
+
+On desktop the page itself never scrolls — the sidebar and workspace scroll independently, so
+your progress panel and session list stay put while you work through a long set. Below 900px the
+shell unwinds into normal document flow and the sidebar becomes an overlay drawer behind the ☰
+button (closes on Escape, on the scrim, or when you load a session).
+
+Before anything is generated the workspace shows a hero prompt instead, and the sidebar is just
+your saved sessions — no point showing a progress ring for a set that doesn't exist.
+
 ## Features
 
 - Free-form textarea (⌘/Ctrl+Enter to submit), with adjustable card and question counts.
-- **Flashcards** — flip animation, prev/next, shuffle, mark *Got it* / *Review later*, and a
-  filter to drill only the flagged ones.
+- **Flashcards** — 3D flip, **drag or swipe sideways** to move between cards (the card follows
+  your pointer and snaps back if you don't cross the threshold), shuffle, mark *Got it* /
+  *Review later*, filter to drill only the flagged ones, and a **jump bar** of ticks coloured by
+  status so you can leap to any card.
+- **Browse** — the whole set as a grid. Tiles flip in place independently, filter by
+  All / Unseen / Known / To review, reveal every answer at once, or hit *Study* on a tile to drop
+  into the deck at exactly that card.
 - **Quiz** — one question at a time, immediate feedback with explanation, score ring, and
   **re-test wrong answers** as its own round. Options are shuffled per round, because models have
   a strong positional bias toward putting the correct answer first.
+- **Live progress panel** — a ring plus known / to-review / untouched counts that update as you
+  study, and your latest quiz score (labelled with the re-test round when relevant).
 - **Refinement loop** — follow-up prompts (*"make the questions harder"*) that edit the existing
   set instead of regenerating from scratch.
 - **Save & reload sessions** — localStorage, validated on read (storage is treated as untrusted).
@@ -189,12 +220,18 @@ return a specific kind of broken response:
 - Dark / light / system theme, keyboard navigation (←/→, 1–9, Space, Enter), mobile layout,
   `prefers-reduced-motion` support.
 
+Card progress lives in `useStudyProgress` at the app level rather than inside the deck, because
+the deck, the browse grid and the sidebar panel all read and write it. Card ids are regenerated
+every time a set is normalized, so the hook watches the first card's id to detect "different set
+now" and starts clean.
+
 ### Keyboard
 
 | Key | Action |
 |---|---|
 | ← / → | Previous / next card |
 | Space / Enter | Flip card (when focused) |
+| Esc | Close the mobile sidebar |
 | 1 / 2 | Mark card *Got it* / *Review later* |
 | 1–9 | Answer a quiz question |
 | Enter | Next question |

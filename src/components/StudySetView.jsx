@@ -1,36 +1,62 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Flashcards } from './Flashcards.jsx';
+import { CardGrid } from './CardGrid.jsx';
 import { Quiz } from './Quiz.jsx';
 import { RepairNotice } from './States.jsx';
 
 const REFINE_EXAMPLES = ['Make the questions harder', 'Add 3 cards about definitions', 'Simplify the wording'];
 
 /**
- * The generated set: flashcards, quiz, and the refinement loop.
+ * The workspace: three ways to work through a set, plus the refinement loop.
  *
- * `resetKey` remounts the two study components whenever the underlying set
+ * `resetKey` remounts the study components whenever the underlying set
  * changes. Card-level progress belongs to a specific set of cards; carrying a
  * half-finished quiz across a regeneration would show scores for questions
  * that no longer exist.
  */
-export function StudySetView({ studySet, meta, busy, onRefine, onRegenerate, onSave, saveState }) {
-  const [tab, setTab] = useState(() => (studySet.flashcards.length ? 'cards' : 'quiz'));
-
-  const resetKey = useMemo(
-    () => studySet.flashcards[0]?.id ?? studySet.quiz[0]?.id ?? 'empty',
-    [studySet]
-  );
-
+export function StudySetView({
+  studySet,
+  meta,
+  busy,
+  onRefine,
+  onRegenerate,
+  onSave,
+  saveState,
+  progress,
+  onQuizRound,
+}) {
   const hasCards = studySet.flashcards.length > 0;
   const hasQuiz = studySet.quiz.length > 0;
-  const activeTab = tab === 'cards' && !hasCards ? 'quiz' : tab === 'quiz' && !hasQuiz ? 'cards' : tab;
+
+  const [tab, setTab] = useState(() => (hasCards ? 'cards' : 'quiz'));
+  const [deckIndex, setDeckIndex] = useState(0);
+
+  const resetKey = useMemo(() => studySet.flashcards[0]?.id ?? studySet.quiz[0]?.id ?? 'empty', [studySet]);
+
+  // A new set starts at the first card.
+  useEffect(() => {
+    setDeckIndex(0);
+  }, [resetKey]);
+
+  const studyCard = useCallback((index) => {
+    setDeckIndex(index);
+    setTab('cards');
+  }, []);
+
+  const tabs = [
+    { id: 'cards', label: 'Flashcards', count: studySet.flashcards.length, enabled: hasCards },
+    { id: 'browse', label: 'Browse', count: studySet.flashcards.length, enabled: hasCards },
+    { id: 'quiz', label: 'Quiz', count: studySet.quiz.length, enabled: hasQuiz },
+  ];
+
+  const activeTab = tabs.find((t) => t.id === tab)?.enabled ? tab : tabs.find((t) => t.enabled)?.id;
 
   return (
-    <section className="study-set" aria-busy={busy}>
-      <header className="study-set__header">
-        <div>
-          <h2 className="study-set__title">{studySet.title}</h2>
-          {studySet.summary && <p className="study-set__summary">{studySet.summary}</p>}
+    <section className="workspace" aria-busy={busy}>
+      <header className="workspace__header">
+        <div className="workspace__heading">
+          <h2 className="workspace__title">{studySet.title}</h2>
+          {studySet.summary && <p className="workspace__summary">{studySet.summary}</p>}
         </div>
         <button type="button" className="btn btn--small" onClick={onSave} disabled={saveState === 'saved'}>
           {saveState === 'saved' ? 'Saved ✓' : 'Save session'}
@@ -40,38 +66,53 @@ export function StudySetView({ studySet, meta, busy, onRefine, onRegenerate, onS
       <RepairNotice repairs={meta?.repairs} onRegenerate={onRegenerate} />
 
       <div className="tabs" role="tablist" aria-label="Study modes">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === 'cards'}
-          className={`tab ${activeTab === 'cards' ? 'is-active' : ''}`}
-          onClick={() => setTab('cards')}
-          disabled={!hasCards}
-        >
-          Flashcards <span className="tab__count">{studySet.flashcards.length}</span>
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={activeTab === 'quiz'}
-          className={`tab ${activeTab === 'quiz' ? 'is-active' : ''}`}
-          onClick={() => setTab('quiz')}
-          disabled={!hasQuiz}
-        >
-          Quiz <span className="tab__count">{studySet.quiz.length}</span>
-        </button>
+        {tabs.map(({ id, label, count, enabled }) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === id}
+            className={`tab ${activeTab === id ? 'is-active' : ''}`}
+            onClick={() => setTab(id)}
+            disabled={!enabled}
+          >
+            {label} <span className="tab__count">{count}</span>
+          </button>
+        ))}
       </div>
 
-      {/* The set stays interactive during a refinement; it just dims. */}
-      <div className={`study-set__body ${busy ? 'is-busy' : ''}`}>
+      {/* The set stays visible during a refinement; it just dims. */}
+      <div className={`workspace__body ${busy ? 'is-busy' : ''}`}>
         {busy && (
-          <div className="study-set__overlay" role="status">
+          <div className="workspace__overlay" role="status">
             <span className="spinner" aria-hidden="true" /> Updating…
           </div>
         )}
 
-        {activeTab === 'cards' && hasCards && <Flashcards key={`cards-${resetKey}`} cards={studySet.flashcards} />}
-        {activeTab === 'quiz' && hasQuiz && <Quiz key={`quiz-${resetKey}`} questions={studySet.quiz} />}
+        {activeTab === 'cards' && hasCards && (
+          <Flashcards
+            key={`cards-${resetKey}`}
+            cards={studySet.flashcards}
+            statuses={progress.statuses}
+            onMark={progress.setStatus}
+            index={deckIndex}
+            onIndex={setDeckIndex}
+          />
+        )}
+
+        {activeTab === 'browse' && hasCards && (
+          <CardGrid
+            key={`browse-${resetKey}`}
+            cards={studySet.flashcards}
+            statuses={progress.statuses}
+            onMark={progress.setStatus}
+            onStudyCard={studyCard}
+          />
+        )}
+
+        {activeTab === 'quiz' && hasQuiz && (
+          <Quiz key={`quiz-${resetKey}`} questions={studySet.quiz} onRoundComplete={onQuizRound} />
+        )}
       </div>
 
       <RefineBar onRefine={onRefine} busy={busy} />
@@ -97,17 +138,15 @@ function RefineBar({ onRefine, busy }) {
 
   return (
     <form className="refine" onSubmit={submit}>
-      <label className="refine__label" htmlFor="refine-input">
-        Refine this set
-      </label>
       <div className="refine__row">
         <input
           id="refine-input"
           className="refine__input"
           value={instruction}
           onChange={(event) => setInstruction(event.target.value)}
-          placeholder="e.g. add 3 harder questions about the Calvin cycle"
+          placeholder="Refine this set — e.g. add 3 harder questions about the Calvin cycle"
           disabled={busy}
+          aria-label="Refine this set"
         />
         <button type="submit" className="btn btn--primary" disabled={busy || instruction.trim().length < 3}>
           {busy ? 'Updating…' : 'Apply'}

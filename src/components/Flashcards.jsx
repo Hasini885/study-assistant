@@ -1,82 +1,71 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
+const SWIPE_THRESHOLD = 70; // px of travel before a drag counts as a swipe
 
 /**
  * Flip-through flashcards.
  *
- * Progress (known / needs-review) lives here rather than in the app-level
- * study-set state, because it is view state: it should survive navigating
- * between cards but reset when a genuinely new set arrives. The `key` on this
- * component in StudySetView does exactly that.
+ * The current card is controlled by the parent (`index` / `onIndex`) so the
+ * browse grid can drop you straight onto a specific card. Ordering and
+ * filtering stay local — they are view state that belongs to the deck.
+ *
+ * `index` always refers to a position in the full `cards` array; `visible` maps
+ * the filtered/shuffled view back onto it.
  */
-export function Flashcards({ cards }) {
+export function Flashcards({ cards, statuses, onMark, index, onIndex }) {
   const [order, setOrder] = useState(() => cards.map((_, i) => i));
-  const [position, setPosition] = useState(0);
   const [flipped, setFlipped] = useState(false);
-  const [statuses, setStatuses] = useState({}); // cardId -> 'known' | 'review'
   const [reviewOnly, setReviewOnly] = useState(false);
 
   const visible = useMemo(() => {
-    const indices = order.filter((i) => cards[i]);
-    if (!reviewOnly) return indices;
-    return indices.filter((i) => statuses[cards[i].id] === 'review');
+    const inRange = order.filter((i) => cards[i]);
+    if (!reviewOnly) return inRange;
+    return inRange.filter((i) => statuses[cards[i].id] === 'review');
   }, [order, cards, reviewOnly, statuses]);
 
-  // Clamp when the visible list shrinks (e.g. after un-flagging the last card).
-  const safePosition = Math.min(position, Math.max(visible.length - 1, 0));
-  const card = cards[visible[safePosition]];
+  // Where the controlled index sits in the current view.
+  const position = Math.max(visible.indexOf(index), 0);
+  const cardIndex = visible[position];
+  const card = cards[cardIndex];
 
   const go = useCallback(
     (delta) => {
+      const next = position + delta;
+      if (next < 0 || next >= visible.length) return;
       setFlipped(false);
-      setPosition((current) => {
-        const next = current + delta;
-        if (next < 0 || next >= visible.length) return current;
-        return next;
-      });
+      onIndex(visible[next]);
     },
-    [visible.length]
+    [position, visible, onIndex]
   );
 
   const mark = useCallback(
     (status) => {
       if (!card) return;
-      setStatuses((current) => ({
-        ...current,
-        [card.id]: current[card.id] === status ? undefined : status,
-      }));
-      // Marking is the "I'm done with this one" gesture, so advance.
-      if (safePosition < visible.length - 1) go(1);
+      onMark(card.id, status);
+      if (position < visible.length - 1) go(1); // marking means "done with this one"
     },
-    [card, go, safePosition, visible.length]
+    [card, onMark, position, visible.length, go]
   );
 
-  const shuffle = useCallback(() => {
-    setOrder((current) => {
-      const next = [...current];
-      for (let i = next.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [next[i], next[j]] = [next[j], next[i]];
-      }
-      return next;
-    });
-    setPosition(0);
-    setFlipped(false);
-  }, []);
+  const { dragX, dragging, handlers, wasDragged } = useSwipe({
+    onSwipeLeft: () => go(1),
+    onSwipeRight: () => go(-1),
+    canSwipeLeft: position < visible.length - 1,
+    canSwipeRight: position > 0,
+  });
 
   useKeyboardShortcuts({
     ArrowRight: () => go(1),
     ArrowLeft: () => go(-1),
-    '1': () => mark('known'),
-    '2': () => mark('review'),
+    1: () => mark('known'),
+    2: () => mark('review'),
   });
 
-  const knownCount = Object.values(statuses).filter((s) => s === 'known').length;
-  const reviewCount = Object.values(statuses).filter((s) => s === 'review').length;
-
+  // If the filter empties the view, offer a way back rather than a blank panel.
   if (!card) {
     return (
       <div className="deck__done">
-        <p>Nothing flagged for review. Turn the filter off to see every card.</p>
+        <p>Nothing flagged for review yet. Mark a card “Review later” to build a drill list.</p>
         <button type="button" className="btn" onClick={() => setReviewOnly(false)}>
           Show all {cards.length} cards
         </button>
@@ -84,61 +73,82 @@ export function Flashcards({ cards }) {
     );
   }
 
+  const status = statuses[card.id];
+
   return (
     <div className="deck">
       <div className="deck__meta">
         <span className="deck__position">
-          Card {safePosition + 1} of {visible.length}
+          <strong>{position + 1}</strong> / {visible.length}
         </span>
-        <div className="deck__tally">
-          <span className="tally tally--known">{knownCount} known</span>
-          <span className="tally tally--review">{reviewCount} to review</span>
+        <div className="deck__tools">
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={reviewOnly}
+              onChange={(event) => setReviewOnly(event.target.checked)}
+            />
+            Flagged only
+          </label>
+          <button
+            type="button"
+            className="btn btn--ghost btn--small"
+            onClick={() => {
+              setOrder((current) => shuffled(current));
+              setFlipped(false);
+            }}
+          >
+            Shuffle
+          </button>
         </div>
       </div>
 
-      <div className="progress" role="progressbar" aria-valuemin={1} aria-valuemax={visible.length} aria-valuenow={safePosition + 1}>
-        <div className="progress__bar" style={{ width: `${((safePosition + 1) / visible.length) * 100}%` }} />
-      </div>
-
-      {/*
-        A <button> so Space and Enter flip the card for free, and screen readers
-        announce it as interactive. aria-live carries the newly revealed face.
-      */}
-      <button
-        type="button"
-        className={`card ${flipped ? 'is-flipped' : ''} ${statuses[card.id] ? `card--${statuses[card.id]}` : ''}`}
-        onClick={() => setFlipped((v) => !v)}
-        aria-label={flipped ? 'Answer. Activate to see the question.' : 'Question. Activate to reveal the answer.'}
+      <div
+        className={`deck__stage ${dragging ? 'is-dragging' : ''}`}
+        style={{ '--drag': `${dragX}px`, '--drag-turn': `${dragX / 28}deg` }}
+        {...handlers}
       >
-        <span className="card__inner">
-          <span className="card__face card__face--front">
-            <span className="card__tag">Question</span>
-            <span className="card__text">{card.front}</span>
-            {card.hint && <span className="card__hint">Hint: {card.hint}</span>}
+        <button
+          type="button"
+          className={`card ${flipped ? 'is-flipped' : ''} ${status ? `card--${status}` : ''}`}
+          onClick={() => {
+            // A drag that ends on the card would otherwise also fire a click.
+            if (wasDragged()) return;
+            setFlipped((v) => !v);
+          }}
+          aria-label={flipped ? 'Answer. Activate to see the question.' : 'Question. Activate to reveal the answer.'}
+        >
+          <span className="card__inner">
+            <span className="card__face card__face--front">
+              <span className="card__tag">Question</span>
+              <span className="card__text">{card.front}</span>
+              {card.hint && <span className="card__hint">Hint: {card.hint}</span>}
+              <span className="card__nudge">Click, or press Space, to flip</span>
+            </span>
+            <span className="card__face card__face--back">
+              <span className="card__tag">Answer</span>
+              <span className="card__text">{card.back}</span>
+            </span>
           </span>
-          <span className="card__face card__face--back">
-            <span className="card__tag">Answer</span>
-            <span className="card__text">{card.back}</span>
-          </span>
-        </span>
-      </button>
+        </button>
+      </div>
 
       <p className="sr-only" aria-live="polite">
         {flipped ? card.back : card.front}
       </p>
 
       <div className="deck__controls">
-        <button type="button" className="btn btn--icon" onClick={() => go(-1)} disabled={safePosition === 0} aria-label="Previous card">
+        <button type="button" className="btn btn--icon" onClick={() => go(-1)} disabled={position === 0} aria-label="Previous card">
           ←
         </button>
-        <button type="button" className="btn" onClick={() => setFlipped((v) => !v)}>
+        <button type="button" className="btn btn--wide" onClick={() => setFlipped((v) => !v)}>
           {flipped ? 'Show question' : 'Reveal answer'}
         </button>
         <button
           type="button"
           className="btn btn--icon"
           onClick={() => go(1)}
-          disabled={safePosition >= visible.length - 1}
+          disabled={position >= visible.length - 1}
           aria-label="Next card"
         >
           →
@@ -146,56 +156,125 @@ export function Flashcards({ cards }) {
       </div>
 
       <div className="deck__marks">
-        <button
-          type="button"
-          className={`btn btn--mark ${statuses[card.id] === 'known' ? 'is-active' : ''}`}
-          onClick={() => mark('known')}
-        >
+        <button type="button" className={`btn btn--mark ${status === 'known' ? 'is-active' : ''}`} onClick={() => mark('known')}>
           Got it <kbd>1</kbd>
         </button>
         <button
           type="button"
-          className={`btn btn--mark btn--mark-review ${statuses[card.id] === 'review' ? 'is-active' : ''}`}
+          className={`btn btn--mark btn--mark-review ${status === 'review' ? 'is-active' : ''}`}
           onClick={() => mark('review')}
         >
           Review later <kbd>2</kbd>
         </button>
       </div>
 
-      <div className="deck__footer">
-        <button type="button" className="btn btn--ghost btn--small" onClick={shuffle}>
-          Shuffle
-        </button>
-        <label className="toggle">
-          <input
-            type="checkbox"
-            checked={reviewOnly}
-            onChange={(event) => {
-              setReviewOnly(event.target.checked);
-              setPosition(0);
-              setFlipped(false);
-            }}
-            disabled={reviewCount === 0 && !reviewOnly}
-          />
-          Only flagged ({reviewCount})
-        </label>
+      {/* Jump bar: one tick per card, coloured by status. */}
+      <div className="jumpbar" role="group" aria-label="Jump to card">
+        {visible.map((i, n) => {
+          const tickStatus = statuses[cards[i].id];
+          return (
+            <button
+              key={cards[i].id}
+              type="button"
+              className={`jumpbar__tick ${n === position ? 'is-current' : ''} ${tickStatus ? `is-${tickStatus}` : ''}`}
+              onClick={() => {
+                setFlipped(false);
+                onIndex(i);
+              }}
+              aria-label={`Go to card ${n + 1}`}
+              aria-current={n === position}
+            />
+          );
+        })}
       </div>
+
+      <p className="deck__hint">Swipe or drag the card sideways · ← → to move · 1 / 2 to mark</p>
     </div>
   );
 }
 
 /**
- * Global key handling that stays out of the way of text fields — otherwise
- * typing "1" into the refine box would flip a flashcard.
+ * Pointer-based swipe, using Pointer Events so mouse drag, touch and pen all
+ * take the same path. The card follows your finger and snaps back if you don't
+ * cross the threshold, which makes the gesture discoverable.
  */
+function useSwipe({ onSwipeLeft, onSwipeRight, canSwipeLeft, canSwipeRight }) {
+  const [dragX, setDragX] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const startRef = useRef(null);
+  // When the last real drag happened. A timestamp rather than a boolean: a drag
+  // that ends off the card never produces a click to clear the flag, and a
+  // stale `true` would then swallow the next keyboard-triggered flip.
+  const draggedAtRef = useRef(0);
+
+  const end = useCallback(() => {
+    if (!startRef.current) return;
+    const dx = dragX;
+    startRef.current = null;
+    setDragging(false);
+    setDragX(0);
+
+    if (dx <= -SWIPE_THRESHOLD && canSwipeLeft) onSwipeLeft();
+    else if (dx >= SWIPE_THRESHOLD && canSwipeRight) onSwipeRight();
+  }, [dragX, canSwipeLeft, canSwipeRight, onSwipeLeft, onSwipeRight]);
+
+  const handlers = {
+    onPointerDown: (event) => {
+      // Ignore secondary buttons; let real clicks through untouched.
+      if (event.button !== 0) return;
+      startRef.current = { x: event.clientX, y: event.clientY };
+      setDragging(true);
+    },
+    onPointerMove: (event) => {
+      if (!startRef.current) return;
+      const dx = event.clientX - startRef.current.x;
+      const dy = event.clientY - startRef.current.y;
+
+      // Vertical intent means the user is scrolling the page, not swiping.
+      if (Math.abs(dx) < 6 && Math.abs(dy) > Math.abs(dx)) {
+        startRef.current = null;
+        setDragging(false);
+        setDragX(0);
+        return;
+      }
+
+      if (Math.abs(dx) > 6) draggedAtRef.current = Date.now();
+      // Resist dragging toward an edge there is nothing beyond.
+      const blocked = (dx < 0 && !canSwipeLeft) || (dx > 0 && !canSwipeRight);
+      setDragX(blocked ? dx * 0.25 : dx);
+    },
+    onPointerUp: end,
+    onPointerCancel: end,
+    onPointerLeave: () => {
+      if (startRef.current) end();
+    },
+  };
+
+  // The click that follows a drag fires within a frame or two of pointerup.
+  return { dragX, dragging, handlers, wasDragged: () => Date.now() - draggedAtRef.current < 300 };
+}
+
+function shuffled(list) {
+  const next = [...list];
+  for (let i = next.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [next[i], next[j]] = [next[j], next[i]];
+  }
+  return next;
+}
+
+/** Global keys, suppressed while typing so the refine box stays usable. */
 function useKeyboardShortcuts(handlers) {
+  const ref = useRef(handlers);
+  ref.current = handlers;
+
   useEffect(() => {
     const onKeyDown = (event) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       const tag = event.target?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || event.target?.isContentEditable) return;
 
-      const handler = handlers[event.key];
+      const handler = ref.current[event.key];
       if (!handler) return;
       event.preventDefault();
       handler();
@@ -203,5 +282,5 @@ function useKeyboardShortcuts(handlers) {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  });
+  }, []);
 }

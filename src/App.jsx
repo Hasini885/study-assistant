@@ -1,25 +1,34 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { fetchHealth } from './api/client.js';
 import { useStudySet } from './hooks/useStudySet.js';
 import { useSessions } from './hooks/useSessions.js';
+import { useStudyProgress } from './hooks/useStudyProgress.js';
 import { useTheme } from './hooks/useTheme.js';
 
 import { PromptForm } from './components/PromptForm.jsx';
 import { StudySetView } from './components/StudySetView.jsx';
+import { ProgressPanel } from './components/ProgressPanel.jsx';
 import { SessionList } from './components/SessionList.jsx';
 import { EmptyState, ErrorBanner, ErrorState, LoadingState } from './components/States.jsx';
 import { SimulationMenu, ThemeToggle } from './components/DevTools.jsx';
+
+const NO_CARDS = []; // stable identity so progress memos don't churn
 
 export default function App() {
   const { theme, cycleTheme } = useTheme();
   const { sessions, saveSession, deleteSession } = useSessions();
   const study = useStudySet();
 
+  const cards = useMemo(() => study.studySet?.flashcards ?? NO_CARDS, [study.studySet]);
+  const progress = useStudyProgress(cards);
+
   const [health, setHealth] = useState(null);
   const [simulate, setSimulate] = useState('');
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [saveState, setSaveState] = useState('idle');
+  const [quizStats, setQuizStats] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Kept so "Regenerate" can re-run the original prompt after a refinement.
   const lastInputRef = useRef('');
@@ -30,17 +39,28 @@ export default function App() {
     return () => controller.abort();
   }, []);
 
-  // A new or changed set is unsaved again.
+  // A new or changed set is unsaved again, and its quiz history no longer applies.
   useEffect(() => {
     setSaveState('idle');
+    setQuizStats(null);
   }, [study.studySet]);
 
+  // Close the mobile drawer on Escape.
+  useEffect(() => {
+    if (!sidebarOpen) return undefined;
+    const onKey = (event) => event.key === 'Escape' && setSidebarOpen(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [sidebarOpen]);
+
   const busy = study.status === 'loading' || study.status === 'refining';
+  const hasSet = Boolean(study.studySet);
 
   const handleGenerate = useCallback(
     ({ input, cardCount, questionCount }) => {
       lastInputRef.current = input;
       setActiveSessionId(null);
+      setSidebarOpen(false);
       study.generate({ input, cardCount, questionCount, simulate: simulate || undefined });
     },
     [study, simulate]
@@ -72,7 +92,7 @@ export default function App() {
       study.load(session.studySet, session.meta);
       setActiveSessionId(session.id);
       setSaveState('saved');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setSidebarOpen(false);
     },
     [study]
   );
@@ -83,20 +103,36 @@ export default function App() {
     lastInputRef.current = '';
   }, [study]);
 
-  // A fatal error with nothing on screen takes over the page; a failure that
-  // happened while a set is already loaded is shown as a dismissible banner
-  // instead, so the user never loses working material to a failed refinement.
+  // A fatal error with nothing on screen takes over the workspace; a failure
+  // that happened while a set is loaded is a dismissible banner instead, so the
+  // user never loses working material to a failed refinement.
   const fatalError = study.status === 'error' && study.error;
 
   return (
     <div className="app">
-      <header className="app__header">
-        <div className="app__brand">
-          <h1 className="app__title">Study Assistant</h1>
-          <p className="app__tagline">Notes in, flashcards and a quiz out.</p>
+      <header className="topbar">
+        <button
+          type="button"
+          className="topbar__menu btn btn--icon btn--ghost"
+          onClick={() => setSidebarOpen((v) => !v)}
+          aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
+          aria-expanded={sidebarOpen}
+        >
+          <span aria-hidden="true">☰</span>
+        </button>
+
+        <div className="topbar__brand">
+          <span className="topbar__mark" aria-hidden="true">
+            ◈
+          </span>
+          <div>
+            <h1 className="topbar__title">Study Assistant</h1>
+            <p className="topbar__tagline">Notes in, flashcards and a quiz out.</p>
+          </div>
         </div>
-        <div className="app__header-actions">
-          {study.studySet && (
+
+        <div className="topbar__actions">
+          {hasSet && (
             <button type="button" className="btn btn--small btn--ghost" onClick={handleReset}>
               New set
             </button>
@@ -105,61 +141,88 @@ export default function App() {
         </div>
       </header>
 
-      {health && !health.configured && (
-        <div className="banner banner--warn" role="alert">
-          <div className="banner__body">
-            <strong>No API key configured</strong>
-            <span>
-              Copy <code>.env.example</code> to <code>.env</code>, add <code>GROQ_API_KEY</code>, and restart the
-              server.
-            </span>
+      <div className="app__body">
+        {sidebarOpen && <div className="scrim" onClick={() => setSidebarOpen(false)} aria-hidden="true" />}
+
+        <aside className={`sidebar ${sidebarOpen ? 'is-open' : ''}`} aria-label="Study controls">
+          {hasSet && (
+            <section className="panel">
+              <h2 className="panel__title">New study set</h2>
+              <PromptForm onSubmit={handleGenerate} busy={busy} compact />
+            </section>
+          )}
+
+          {hasSet && (
+            <ProgressPanel counts={progress.counts} quizStats={quizStats} onResetProgress={progress.reset} />
+          )}
+
+          <SessionList
+            sessions={sessions}
+            onLoad={handleLoadSession}
+            onDelete={deleteSession}
+            activeId={activeSessionId}
+          />
+
+          <div className="sidebar__footer">
+            <SimulationMenu modes={health?.simulations} value={simulate} onChange={setSimulate} />
+            {health?.model && <span className="sidebar__model">model: {health.model}</span>}
           </div>
-        </div>
-      )}
+        </aside>
 
-      <main className="app__main">
-        {fatalError ? (
-          <ErrorState error={study.error} onRetry={study.retry} onReset={handleReset} />
-        ) : (
-          <>
-            <PromptForm onSubmit={handleGenerate} busy={busy} compact={Boolean(study.studySet)} />
+        <main className="main">
+          {health && !health.configured && (
+            <div className="banner banner--warn" role="alert">
+              <div className="banner__body">
+                <strong>No API key configured</strong>
+                <span>
+                  Copy <code>.env.example</code> to <code>.env</code>, add <code>GROQ_API_KEY</code>, and restart
+                  the server.
+                </span>
+              </div>
+            </div>
+          )}
 
-            {study.error && study.studySet && (
-              <ErrorBanner error={study.error} onRetry={study.retry} onDismiss={study.dismissError} />
-            )}
+          {fatalError ? (
+            <ErrorState error={study.error} onRetry={study.retry} onReset={handleReset} />
+          ) : (
+            <>
+              {study.error && hasSet && (
+                <ErrorBanner error={study.error} onRetry={study.retry} onDismiss={study.dismissError} />
+              )}
 
-            {study.status === 'loading' && <LoadingState onCancel={study.cancel} />}
+              {!hasSet && study.status !== 'loading' && (
+                <section className="hero">
+                  <div className="hero__intro">
+                    <h2 className="hero__title">What are you studying?</h2>
+                    <p className="hero__lede">
+                      Paste a page of notes or name a topic. You'll get flashcards to flip through and a quiz
+                      that re-tests whatever you get wrong.
+                    </p>
+                  </div>
+                  <PromptForm onSubmit={handleGenerate} busy={busy} />
+                  <EmptyState />
+                </section>
+              )}
 
-            {study.studySet && (
-              <StudySetView
-                studySet={study.studySet}
-                meta={study.meta}
-                busy={study.status === 'refining'}
-                onRefine={handleRefine}
-                onRegenerate={lastInputRef.current ? handleRegenerate : null}
-                onSave={handleSave}
-                saveState={saveState}
-              />
-            )}
+              {study.status === 'loading' && <LoadingState onCancel={study.cancel} />}
 
-            {study.status === 'idle' && !study.studySet && <EmptyState />}
-
-            {!study.studySet && (
-              <SessionList
-                sessions={sessions}
-                onLoad={handleLoadSession}
-                onDelete={deleteSession}
-                activeId={activeSessionId}
-              />
-            )}
-          </>
-        )}
-      </main>
-
-      <footer className="app__footer">
-        <SimulationMenu modes={health?.simulations} value={simulate} onChange={setSimulate} />
-        {health?.model && <span className="app__model">model: {health.model}</span>}
-      </footer>
+              {hasSet && (
+                <StudySetView
+                  studySet={study.studySet}
+                  meta={study.meta}
+                  busy={study.status === 'refining'}
+                  onRefine={handleRefine}
+                  onRegenerate={lastInputRef.current ? handleRegenerate : null}
+                  onSave={handleSave}
+                  saveState={saveState}
+                  progress={progress}
+                  onQuizRound={setQuizStats}
+                />
+              )}
+            </>
+          )}
+        </main>
+      </div>
     </div>
   );
 }

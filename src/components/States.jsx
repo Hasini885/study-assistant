@@ -102,15 +102,26 @@ export function ErrorBanner({ error, onRetry, onDismiss }) {
   );
 }
 
+const PERKS = [
+  { icon: '🗂', title: 'Flip through cards', text: 'Swipe or drag, mark what you know, drill only what you flagged.' },
+  { icon: '✎', title: 'Take the quiz', text: 'Multiple choice with instant feedback and an explanation each time.' },
+  { icon: '↻', title: 'Re-test the misses', text: 'Wrong answers come back as their own round until they stick.' },
+];
+
+/** Shown before anything has been generated — says what you'll get, not what to do. */
 export function EmptyState() {
   return (
-    <section className="state state--empty">
-      <h2 className="state__title">Nothing to study yet</h2>
-      <p className="state__message">
-        Paste a page of notes or name a topic above. You will get flashcards to flip through and a quiz that
-        re-tests whatever you get wrong.
-      </p>
-    </section>
+    <ul className="perks">
+      {PERKS.map(({ icon, title, text }) => (
+        <li className="perk" key={title}>
+          <span className="perk__icon" aria-hidden="true">
+            {icon}
+          </span>
+          <span className="perk__title">{title}</span>
+          <span className="perk__text">{text}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
 

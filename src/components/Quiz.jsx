@@ -87,7 +87,7 @@ function reducer(state, action) {
   }
 }
 
-export function Quiz({ questions }) {
+export function Quiz({ questions, onRoundComplete }) {
   const [state, dispatch] = useReducer(reducer, questions, init);
 
   const question = state.queue[state.index];
@@ -99,6 +99,14 @@ export function Quiz({ questions }) {
   );
   const correctCount = roundResults.filter((r) => r.result?.correct).length;
   const wrongCount = roundResults.filter((r) => r.result && !r.result.correct).length;
+
+  // Publish the round's score so the sidebar can show it. Reporting the latest
+  // result (rather than accumulating) keeps this idempotent, so StrictMode's
+  // double-invoked effects in development can't double-count anything.
+  useEffect(() => {
+    if (!state.finished) return;
+    onRoundComplete?.({ round: state.round, correct: correctCount, total: state.queue.length });
+  }, [state.finished, state.round, state.queue.length, correctCount, onRoundComplete]);
 
   // Number keys pick an option; Enter moves on.
   useEffect(() => {

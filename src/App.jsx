@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { fetchHealth } from './api/client.js';
+import { hueFromString } from './lib/hue.js';
 import { useStudySet } from './hooks/useStudySet.js';
 import { useSessions } from './hooks/useSessions.js';
 import { useStudyProgress } from './hooks/useStudyProgress.js';
@@ -11,7 +12,7 @@ import { PromptForm } from './components/PromptForm.jsx';
 import { StudySetView } from './components/StudySetView.jsx';
 import { ProgressPanel } from './components/ProgressPanel.jsx';
 import { SessionList } from './components/SessionList.jsx';
-import { EmptyState, ErrorBanner, ErrorState, LoadingState } from './components/States.jsx';
+import { EmptyState, ErrorBanner, ErrorState, HeroArt, LoadingState } from './components/States.jsx';
 import { FullscreenToggle, SimulationMenu, ThemeToggle } from './components/DevTools.jsx';
 
 const NO_CARDS = []; // stable identity so progress memos don't churn
@@ -57,6 +58,10 @@ export default function App() {
 
   const busy = study.status === 'loading' || study.status === 'refining';
   const hasSet = Boolean(study.studySet);
+
+  // Each set carries its own accent, derived from its title. Set on the root so
+  // the whole app — rings, tabs, highlights — takes on the set's identity.
+  const hue = hasSet ? hueFromString(study.studySet.title) : null;
 
   const handleGenerate = useCallback(
     ({ input, cardCount, questionCount }) => {
@@ -111,7 +116,7 @@ export default function App() {
   const fatalError = study.status === 'error' && study.error;
 
   return (
-    <div className="app">
+    <div className="app" style={hue === null ? undefined : { '--hue': hue }}>
       <header className="topbar">
         <button
           type="button"
@@ -200,11 +205,14 @@ export default function App() {
               {!hasSet && study.status !== 'loading' && (
                 <section className="hero">
                   <div className="hero__intro">
-                    <h2 className="hero__title">What are you studying?</h2>
-                    <p className="hero__lede">
-                      Paste a page of notes or name a topic. You'll get flashcards to flip through and a quiz
-                      that re-tests whatever you get wrong.
-                    </p>
+                    <div>
+                      <h2 className="hero__title">What are you studying?</h2>
+                      <p className="hero__lede">
+                        Paste a page of notes or name a topic. You'll get flashcards to flip through and a quiz
+                        that re-tests whatever you get wrong.
+                      </p>
+                    </div>
+                    <HeroArt />
                   </div>
                   <PromptForm onSubmit={handleGenerate} busy={busy} />
                   <EmptyState />

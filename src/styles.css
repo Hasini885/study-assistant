@@ -1973,11 +1973,18 @@ kbd {
   min-height: 100dvh;
   display: grid;
   place-items: center;
-  padding: 6vh clamp(20px, 5vw, 72px);
+  padding: 6vh clamp(20px, 5vw, 72px) 96px;
   overflow: hidden;
   text-align: center;
 }
 
+/*
+  Parallax. Two planes moving opposite ways off one pointer position: the card
+  layer leads, the wordmark counter-moves by less. `translate` as an individual
+  property so it composes with the cards' own float animation instead of
+  overwriting it, and a long transition so the motion glides rather than
+  tracking the cursor 1:1.
+*/
 .landing__inner {
   position: relative;
   z-index: 2;
@@ -1986,6 +1993,24 @@ kbd {
   flex-direction: column;
   align-items: center;
   gap: 20px;
+  translate: calc(var(--px, 0) * -14px) calc(var(--py, 0) * -10px);
+  transition: translate 0.6s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+/* The example topic cycles, so the page is never completely static. */
+.landing__topic {
+  display: inline-block;
+  color: var(--accent);
+  font-weight: 600;
+  animation: topicIn 0.45s cubic-bezier(0.2, 0.9, 0.3, 1) backwards;
+}
+
+@keyframes topicIn {
+  from {
+    opacity: 0;
+    transform: translateY(0.5em) rotate(-2.5deg);
+    filter: blur(4px);
+  }
 }
 
 .landing__eyebrow {
@@ -2076,6 +2101,8 @@ kbd {
   inset: 0;
   z-index: 1;
   pointer-events: none;
+  translate: calc(var(--px, 0) * 30px) calc(var(--py, 0) * 22px);
+  transition: translate 0.5s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 
 .landing__card {
@@ -2122,6 +2149,109 @@ kbd {
   }
 }
 
+/* Editorial ticker along the bottom. */
+.marquee {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  padding: 13px 0;
+  overflow: hidden;
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  /* Fade both ends so items enter and leave instead of popping at the edge. */
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+}
+
+.marquee__track {
+  display: flex;
+  width: max-content;
+  /* The list is rendered twice, so -50% lands exactly on the seam. */
+  animation: scrollX 30s linear infinite;
+}
+
+.marquee__item {
+  position: relative;
+  padding: 0 30px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.marquee__item::after {
+  content: '◆';
+  position: absolute;
+  right: -5px;
+  color: var(--accent);
+  opacity: 0.55;
+  letter-spacing: 0;
+}
+
+@keyframes scrollX {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* ---- exit: the page scatters on the way out ---- */
+
+.landing.is-leaving .landing__inner {
+  animation: leaveUp 0.42s cubic-bezier(0.4, 0, 0.7, 0.2) forwards;
+}
+
+.landing.is-leaving .marquee {
+  animation: leaveDown 0.42s ease forwards;
+}
+
+.landing.is-leaving .landing__card--1 {
+  animation: scatterLeft 0.42s cubic-bezier(0.4, 0, 0.8, 0.4) forwards;
+}
+
+.landing.is-leaving .landing__card--2 {
+  animation: scatterRight 0.42s cubic-bezier(0.4, 0, 0.8, 0.4) forwards;
+}
+
+.landing.is-leaving .landing__card--3 {
+  animation: scatterLeft 0.42s cubic-bezier(0.4, 0, 0.8, 0.4) forwards;
+  animation-delay: 0.04s;
+}
+
+@keyframes leaveUp {
+  to {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.96);
+  }
+}
+
+@keyframes leaveDown {
+  to {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+}
+
+@keyframes scatterLeft {
+  to {
+    translate: -46vw 12vh;
+    rotate: -48deg;
+    opacity: 0;
+  }
+}
+
+@keyframes scatterRight {
+  to {
+    translate: 46vw 14vh;
+    rotate: 42deg;
+    opacity: 0;
+  }
+}
+
 @media (max-width: 700px) {
   .landing__card--3 {
     display: none;
@@ -2129,6 +2259,11 @@ kbd {
 
   .landing__card {
     opacity: 0.28;
+  }
+
+  .marquee__item {
+    padding: 0 20px;
+    font-size: 0.66rem;
   }
 }
 
@@ -2212,6 +2347,43 @@ kbd {
 .deck__ghost--2 {
   transform: rotate(-2.4deg) scale(0.97) translateY(10px);
   opacity: 0.45;
+}
+
+/* Rubber stamp on marked cards — the paper metaphor taken to its conclusion. */
+.card__stamp {
+  position: absolute;
+  top: 16px;
+  right: 14px;
+  z-index: 2;
+  padding: 5px 12px;
+  font-family: var(--font);
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  border: 2px solid currentColor;
+  border-radius: 6px;
+  rotate: -13deg;
+  opacity: 0.55;
+  animation: stampIn 0.34s cubic-bezier(0.2, 1.7, 0.4, 1);
+}
+
+.card__stamp--known {
+  color: var(--correct);
+}
+
+.card__stamp--review {
+  color: var(--warn);
+}
+
+@keyframes stampIn {
+  from {
+    opacity: 0;
+    scale: 2.1;
+  }
+  60% {
+    opacity: 0.55;
+  }
 }
 
 /* Highlighter swash under the set title, drawn as a background gradient. */
@@ -2534,7 +2706,14 @@ kbd {
      shortening them — a 0.01ms infinite loop is still a repaint every frame. */
   body::before,
   .progress__bar::after,
-  .landing__card {
+  .landing__card,
+  .marquee__track {
     animation: none;
+  }
+
+  /* Parallax is pointer-driven, not time-driven, so it needs cancelling too. */
+  .landing__inner,
+  .landing__deck {
+    translate: none;
   }
 }

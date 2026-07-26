@@ -13,7 +13,6 @@ import express from 'express';
 
 import { callGroq, UpstreamError } from './groq.js';
 import { buildGenerateMessages, buildRefineMessages, buildRepairMessages } from './prompt.js';
-import { isSimulationEnabled, simulateRawCompletion, SIMULATION_MODES } from './simulate.js';
 import { extractJson } from '../shared/extractJson.js';
 import { normalizeStudySet, isValidStudySet } from '../shared/normalize.js';
 
@@ -34,29 +33,23 @@ app.get('/api/health', (req, res) => {
     ok: true,
     configured: Boolean(process.env.GROQ_API_KEY),
     model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
-    simulations: isSimulationEnabled() ? SIMULATION_MODES : null,
   });
 });
 
 app.post('/api/study-set', async (req, res) => {
-  const { input, cardCount, questionCount, simulate } = req.body ?? {};
+  const { input } = req.body ?? {};
 
   const invalid = validateInput(input);
   if (invalid) return sendError(res, invalid);
 
   await run(req, res, {
-    messages: buildGenerateMessages({
-      input: input.trim(),
-      cardCount: clampCount(cardCount, 3, 20, 8),
-      questionCount: clampCount(questionCount, 3, 15, 5),
-    }),
+    messages: buildGenerateMessages({ input: input.trim() }),
     topic: input.trim(),
-    simulate,
   });
 });
 
 app.post('/api/refine', async (req, res) => {
-  const { studySet, instruction, simulate } = req.body ?? {};
+  const { studySet, instruction } = req.body ?? {};
 
   const invalid = validateInput(instruction, 'instruction');
   if (invalid) return sendError(res, invalid);
@@ -70,7 +63,6 @@ app.post('/api/refine', async (req, res) => {
   await run(req, res, {
     messages: buildRefineMessages({ studySet, instruction: instruction.trim() }),
     topic: studySet.title,
-    simulate,
   });
 });
 
@@ -78,7 +70,7 @@ app.post('/api/refine', async (req, res) => {
 /* pipeline                                                                   */
 /* -------------------------------------------------------------------------- */
 
-async function run(req, res, { messages, topic, simulate }) {
+async function run(req, res, { messages, topic }) {
   // If the user hits "cancel" or navigates away, stop the upstream call too.
   //
   // This listens on `res`, not `req`: since Node 16 the request stream emits
@@ -93,7 +85,7 @@ async function run(req, res, { messages, topic, simulate }) {
 
   const startedAt = Date.now();
   try {
-    const result = await generate({ messages, topic, simulate, signal: controller.signal });
+    const result = await generate({ messages, topic, signal: controller.signal });
     if (res.writableEnded) return;
     res.json({
       studySet: result.data,
@@ -110,13 +102,13 @@ async function run(req, res, { messages, topic, simulate }) {
  * model its own bad output and ask once more. Two attempts is the sweet spot:
  * a third rarely converges and the user is already waiting.
  */
-async function generate({ messages, topic, simulate, signal }) {
+async function generate({ messages, topic, signal }) {
   let attemptMessages = messages;
   let lastProblem = 'Unknown parsing failure.';
   const repairs = [];
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const completion = await getCompletion({ messages: attemptMessages, simulate, signal });
+    const completion = await callGroq({ messages: attemptMessages, signal });
     const truncated = completion.finishReason === 'length';
 
     const extracted = extractJson(completion.content);
@@ -138,7 +130,6 @@ async function generate({ messages, topic, simulate, signal }) {
             attempts: attempt,
             recovery: extracted.strategy,
             model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
-            simulated: simulate || null,
           },
         };
       }
@@ -172,30 +163,6 @@ async function generate({ messages, topic, simulate, signal }) {
   );
 }
 
-async function getCompletion({ messages, simulate, signal }) {
-  if (simulate && isSimulationEnabled()) {
-    try {
-      const content = await simulateRawCompletion(simulate, { signal });
-      if (content !== null) return { content, finishReason: 'stop', simulated: true };
-    } catch (error) {
-      if (error.simulatedStatus === 429) {
-        throw new UpstreamError('rate_limited', 'Rate limit reached. Wait a few seconds and try again.', {
-          status: 429,
-          retryable: true,
-        });
-      }
-      if (error.simulatedStatus === 500) {
-        throw new UpstreamError('provider_down', 'The model provider is having trouble. Try again in a moment.', {
-          status: 502,
-          retryable: true,
-        });
-      }
-      throw error;
-    }
-  }
-  return callGroq({ messages, signal });
-}
-
 /* -------------------------------------------------------------------------- */
 /* helpers                                                                    */
 /* -------------------------------------------------------------------------- */
@@ -215,12 +182,6 @@ function validateInput(value, label = 'input') {
     );
   }
   return null;
-}
-
-function clampCount(value, min, max, fallback) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.min(max, Math.max(min, Math.round(n)));
 }
 
 function describeStrategy(strategy) {

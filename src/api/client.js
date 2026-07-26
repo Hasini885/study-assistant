@@ -55,12 +55,12 @@ async function postJson(url, body, signal) {
   return { studySet: payload.studySet, meta: payload.meta ?? {} };
 }
 
-export function createStudySet({ input, cardCount, questionCount, simulate }, signal) {
-  return postJson('/api/study-set', { input, cardCount, questionCount, simulate }, signal);
+export function createStudySet({ input }, signal) {
+  return postJson('/api/study-set', { input }, signal);
 }
 
-export function refineStudySet({ studySet, instruction, simulate }, signal) {
-  return postJson('/api/refine', { studySet, instruction, simulate }, signal);
+export function refineStudySet({ studySet, instruction }, signal) {
+  return postJson('/api/refine', { studySet, instruction }, signal);
 }
 
 export async function fetchHealth(signal) {

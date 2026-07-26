@@ -14,7 +14,7 @@ import { StudySetView } from './components/StudySetView.jsx';
 import { ProgressPanel } from './components/ProgressPanel.jsx';
 import { SessionList } from './components/SessionList.jsx';
 import { EmptyState, ErrorBanner, ErrorState, HeroArt, LoadingState } from './components/States.jsx';
-import { FullscreenToggle, SimulationMenu, ThemeToggle } from './components/DevTools.jsx';
+import { FullscreenToggle, ThemeToggle } from './components/DevTools.jsx';
 
 const NO_CARDS = []; // stable identity so progress memos don't churn
 
@@ -28,7 +28,6 @@ export default function App() {
   const progress = useStudyProgress(cards);
 
   const [health, setHealth] = useState(null);
-  const [simulate, setSimulate] = useState('');
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [saveState, setSaveState] = useState('idle');
   const [quizStats, setQuizStats] = useState(null);
@@ -66,27 +65,27 @@ export default function App() {
   const hue = hasSet ? hueFromString(study.studySet.title) : null;
 
   const handleGenerate = useCallback(
-    ({ input, cardCount, questionCount }) => {
+    ({ input }) => {
       lastInputRef.current = input;
       setActiveSessionId(null);
       setSidebarOpen(false);
-      study.generate({ input, cardCount, questionCount, simulate: simulate || undefined });
+      study.generate({ input });
     },
-    [study, simulate]
+    [study]
   );
 
   const handleRefine = useCallback(
     (instruction) => {
       if (!study.studySet) return;
-      study.refine({ studySet: study.studySet, instruction, simulate: simulate || undefined });
+      study.refine({ studySet: study.studySet, instruction });
     },
-    [study, simulate]
+    [study]
   );
 
   const handleRegenerate = useCallback(() => {
     if (!lastInputRef.current) return;
-    study.generate({ input: lastInputRef.current, simulate: simulate || undefined });
-  }, [study, simulate]);
+    study.generate({ input: lastInputRef.current });
+  }, [study]);
 
   const handleSave = useCallback(() => {
     const id = saveSession(study.studySet, study.meta, activeSessionId);
@@ -193,10 +192,11 @@ export default function App() {
             activeId={activeSessionId}
           />
 
-          <div className="sidebar__footer">
-            <SimulationMenu modes={health?.simulations} value={simulate} onChange={setSimulate} />
-            {health?.model && <span className="sidebar__model">model: {health.model}</span>}
-          </div>
+          {health?.model && (
+            <div className="sidebar__footer">
+              <span className="sidebar__model">model: {health.model}</span>
+            </div>
+          )}
         </aside>
 
         <main className="main">

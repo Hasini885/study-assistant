@@ -104,14 +104,10 @@ export function useStudySet() {
     }
   }, []);
 
-  const generate = useCallback(
-    ({ input, cardCount, questionCount, simulate }) =>
-      send({ mode: 'generate', payload: { input, cardCount, questionCount, simulate } }),
-    [send]
-  );
+  const generate = useCallback(({ input }) => send({ mode: 'generate', payload: { input } }), [send]);
 
   const refine = useCallback(
-    ({ studySet, instruction, simulate }) => send({ mode: 'refine', payload: { studySet, instruction, simulate } }),
+    ({ studySet, instruction }) => send({ mode: 'refine', payload: { studySet, instruction } }),
     [send]
   );
 

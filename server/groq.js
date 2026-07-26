@@ -27,8 +27,29 @@ export class UpstreamError extends Error {
   }
 }
 
+/**
+ * The API key, sanitised.
+ *
+ * Secrets arrive via copy-paste, dashboards and shell pipelines, and pick up
+ * passengers on the way: a UTF-8 BOM, a trailing newline, wrapping quotes.
+ * Any of those makes the Authorization header throw `Cannot convert argument
+ * to a ByteString`, which surfaces as an unhelpful "could not reach the model
+ * provider". Cheaper to strip them than to debug them twice.
+ */
+function apiKey() {
+  return (process.env.GROQ_API_KEY || '')
+    .replace(/^﻿/, '')
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .trim();
+}
+
+export function hasApiKey() {
+  return apiKey().length > 0;
+}
+
 export function assertConfigured() {
-  if (!process.env.GROQ_API_KEY) {
+  if (!hasApiKey()) {
     throw new UpstreamError(
       'not_configured',
       'No GROQ_API_KEY found. Copy .env.example to .env and add your key from https://console.groq.com/keys',
@@ -56,7 +77,7 @@ export async function callGroq({ messages, signal, temperature = 0.3, maxTokens 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+        Authorization: `Bearer ${apiKey()}`,
       },
       body: JSON.stringify({
         model: process.env.GROQ_MODEL || DEFAULT_MODEL,
@@ -72,6 +93,11 @@ export async function callGroq({ messages, signal, temperature = 0.3, maxTokens 
     if (error.name === 'TimeoutError' || error.name === 'AbortError') {
       throw new UpstreamError('timeout', 'The model took too long to respond.', { status: 504, retryable: true });
     }
+    // `fetch` reports transport failures as a bare TypeError and hides the real
+    // reason (DNS, TLS, ECONNREFUSED…) on `cause`. Log it: without this, a
+    // deploy that cannot reach Groq looks identical to one that can't resolve
+    // it, and the user-facing message is the same either way.
+    console.error('[groq] request failed:', error.name, error.message, '| cause:', error.cause ?? '(none)');
     throw new UpstreamError('network', 'Could not reach the model provider.', { status: 502, retryable: true });
   }
 

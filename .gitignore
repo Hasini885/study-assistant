@@ -6,3 +6,6 @@ dist
 *.err
 .DS_Store
 .vscode
+
+.vercel
+.env*

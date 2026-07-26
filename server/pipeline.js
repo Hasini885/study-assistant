@@ -7,7 +7,7 @@
  * set", and no chance of the two drifting apart.
  */
 
-import { callGroq, UpstreamError } from './groq.js';
+import { callGroq, hasApiKey, UpstreamError } from './groq.js';
 import { buildGenerateMessages, buildRefineMessages, buildRepairMessages } from './prompt.js';
 import { extractJson } from '../shared/extractJson.js';
 import { normalizeStudySet, isValidStudySet } from '../shared/normalize.js';
@@ -24,7 +24,9 @@ export function defaultModel() {
 export function healthPayload() {
   return {
     ok: true,
-    configured: Boolean(process.env.GROQ_API_KEY),
+    // Same sanitising as the real call, so health can't report a usable key
+    // when only whitespace or a BOM is present.
+    configured: hasApiKey(),
     model: defaultModel(),
   };
 }

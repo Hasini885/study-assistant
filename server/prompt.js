@@ -44,12 +44,17 @@ Content rules:
 - Match the user's language.
 - If the input is too vague or short to make study material from, return {"title":"","summary":"","flashcards":[],"quiz":[]} rather than inventing a topic.`;
 
-export function buildGenerateMessages({ input, cardCount = 8, questionCount = 5 }) {
+/** How much material a set contains. Fixed rather than user-facing: more knobs
+ *  did not make the tool better, and a predictable size keeps the wait short. */
+const CARD_COUNT = 8;
+const QUESTION_COUNT = 5;
+
+export function buildGenerateMessages({ input }) {
   return [
     { role: 'system', content: SYSTEM_PROMPT },
     {
       role: 'user',
-      content: `Create ${cardCount} flashcards and ${questionCount} multiple-choice questions from the following.\n\n---\n${input}\n---`,
+      content: `Create ${CARD_COUNT} flashcards and ${QUESTION_COUNT} multiple-choice questions from the following.\n\n---\n${input}\n---`,
     },
   ];
 }

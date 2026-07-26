@@ -590,30 +590,6 @@ kbd {
   flex: 1;
 }
 
-.prompt-form__options {
-  display: grid;
-  gap: 12px;
-  padding: 12px;
-  background: var(--surface-2);
-  border-radius: 10px;
-}
-
-.panel .prompt-form__options {
-  background: var(--surface);
-}
-
-.slider {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 0.85rem;
-}
-
-.slider input {
-  accent-color: var(--accent);
-  width: 100%;
-}
-
 .chips {
   display: flex;
   flex-wrap: wrap;
@@ -1800,30 +1776,6 @@ kbd {
 .session__delete:hover {
   color: var(--wrong);
   background: var(--wrong-soft);
-}
-
-/* ---------------------------------------------------------------- devtools */
-
-.devtools {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.devtools select {
-  font: inherit;
-  font-size: 0.76rem;
-  color: var(--text);
-  background: var(--surface-2);
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  padding: 5px 7px;
-  width: 100%;
-}
-
-.devtools__active {
-  color: var(--warn);
-  font-weight: 600;
 }
 
 /* ----------------------------------------------------------- wide screens -- */

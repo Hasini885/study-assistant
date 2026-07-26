@@ -16,9 +16,6 @@ const EXAMPLES = [
  */
 export function PromptForm({ onSubmit, busy, compact = false }) {
   const [input, setInput] = useState('');
-  const [cardCount, setCardCount] = useState(8);
-  const [questionCount, setQuestionCount] = useState(5);
-  const [showOptions, setShowOptions] = useState(false);
   const textareaRef = useRef(null);
 
   const trimmed = input.trim();
@@ -32,7 +29,7 @@ export function PromptForm({ onSubmit, busy, compact = false }) {
   const submit = (event) => {
     event?.preventDefault();
     if (!canSubmit) return;
-    onSubmit({ input: trimmed, cardCount, questionCount });
+    onSubmit({ input: trimmed });
   };
 
   const onKeyDown = (event) => {
@@ -65,9 +62,7 @@ export function PromptForm({ onSubmit, busy, compact = false }) {
       </div>
 
       <p id="prompt-help" className="prompt-form__help">
-        {tooLong
-          ? 'That is too long — try one section at a time.'
-          : 'Press ⌘/Ctrl + Enter to generate.'}
+        {tooLong ? 'That is too long — try one section at a time.' : 'Press ⌘/Ctrl + Enter to generate.'}
       </p>
 
       {!compact && (
@@ -93,58 +88,7 @@ export function PromptForm({ onSubmit, busy, compact = false }) {
         <button type="submit" className="btn btn--primary" disabled={!canSubmit}>
           {busy ? 'Generating…' : 'Generate study set'}
         </button>
-
-        <button
-          type="button"
-          className="btn btn--ghost"
-          onClick={() => setShowOptions((v) => !v)}
-          aria-expanded={showOptions}
-        >
-          {showOptions ? 'Hide options' : 'Options'}
-        </button>
       </div>
-
-      {showOptions && (
-        <div className="prompt-form__options">
-          <Slider
-            id="card-count"
-            label="Flashcards"
-            value={cardCount}
-            min={3}
-            max={20}
-            onChange={setCardCount}
-            disabled={busy}
-          />
-          <Slider
-            id="question-count"
-            label="Quiz questions"
-            value={questionCount}
-            min={3}
-            max={15}
-            onChange={setQuestionCount}
-            disabled={busy}
-          />
-        </div>
-      )}
     </form>
-  );
-}
-
-function Slider({ id, label, value, min, max, onChange, disabled }) {
-  return (
-    <div className="slider">
-      <label htmlFor={id}>
-        {label} <strong>{value}</strong>
-      </label>
-      <input
-        id={id}
-        type="range"
-        min={min}
-        max={max}
-        value={value}
-        disabled={disabled}
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
-    </div>
   );
 }

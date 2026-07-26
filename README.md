@@ -1,5 +1,7 @@
 # Study Assistant
 
+**Live: https://study-assistant-indol-pi.vercel.app**
+
 Paste your notes (or just name a topic), and get a set of flashcards to flip through plus a
 multiple-choice quiz that re-tests whatever you got wrong.
 
@@ -97,6 +99,14 @@ vercel --prod
   a portfolio link; add rate limiting before it goes anywhere real.
 - **Rotate your key** if it has ever been pasted somewhere it shouldn't be — deploying makes it
   live.
+- **Watch for invisible characters in the key.** The first deploy failed with a generic "could
+  not reach the model provider". The real cause was in the function logs: `Cannot convert
+  argument to a ByteString because the character at index 7 has a value of 65279` — U+FEFF, a
+  byte-order mark, prefixed onto the key by the shell pipeline that set the variable. `Bearer `
+  is seven characters, so index 7 was the first character of the key. `server/groq.js` now
+  strips BOMs, wrapping quotes and whitespace before building the header, and logs the
+  underlying `cause` of any transport failure so this is one log line to diagnose next time
+  rather than a guess.
 
 ---
 

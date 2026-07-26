@@ -239,6 +239,40 @@ doesn't exist.
 - Dark / light / system theme, native fullscreen toggle, keyboard navigation (←/→, 1–9, Space,
   Enter), mobile layout, `prefers-reduced-motion` support.
 
+## Motion and visuals
+
+No animation library — everything is CSS keyframes plus one small rAF hook, which keeps the
+bundle small and every effect explainable.
+
+- **Ambient backdrop** — two slow-drifting colour washes behind the app, and a frosted
+  `backdrop-filter` topbar. Low enough in opacity that text contrast is untouched.
+- **Directional card travel** — moving through the deck flies the incoming card in from the side
+  you moved toward. The wrapper is keyed on the card index, so React remounts it and the entrance
+  animation restarts; `data-dir` picks the keyframe.
+- **Staggered entrances** — quiz options, grid tiles, rail rows and result rows cascade in via a
+  `--i` custom property driving `animation-delay`.
+- **Answer feedback** — a wrong pick shakes, a right one pops.
+- **Streak counter** — consecutive correct answers surface a 🔥 chip that pops in on each
+  increment (keyed on the streak value so the animation replays), and your best run is reported
+  on the results screen.
+- **Confetti** — a 26-piece DOM burst on a perfect round or a cleared re-test. Each piece gets
+  randomised offset, spin, delay and scale via custom properties, driven by one keyframe rule.
+  It unmounts itself when the burst finishes.
+- **Animated counters** — `useAnimatedNumber` tweens with `requestAnimationFrame`, because a
+  `conic-gradient` can't be transitioned in CSS. Animating the *value* is what makes the progress
+  ring and score ring sweep instead of jump.
+
+Two details worth knowing:
+
+- Entrance animations use `animation-fill-mode: backwards`, not `both`. `both` holds the final
+  transform after the animation ends, which then beats `:hover` transforms further down the
+  cascade — tiles would stop lifting on hover. `backwards` only applies the `from` state during
+  the stagger delay, which is all the stagger needs.
+- Under `prefers-reduced-motion` the global rule collapses every duration, and the ambient drift
+  and progress shimmer are additionally set to `animation: none` — an infinite loop shortened to
+  0.01ms still repaints every frame. `Confetti` checks the media query in JS and renders nothing
+  at all.
+
 Card progress lives in `useStudyProgress` at the app level rather than inside the deck, because
 the deck, the browse grid and the sidebar panel all read and write it. Card ids are regenerated
 every time a set is normalized, so the hook watches the first card's id to detect "different set

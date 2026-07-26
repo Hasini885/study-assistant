@@ -8,6 +8,37 @@ multiple-choice quiz that re-tests whatever you got wrong.
 The model returns structured JSON. The app parses it, repairs what it can, throws away what it
 can't, and renders interactive components. There is no chat window anywhere.
 
+**Demo video:** [`demo.mp4`](demo.mp4)
+
+---
+
+## Repo layout
+
+```
+frontend/     the React app (Vite)
+backend/      the API, the model client, and the study-set schema
+api/          Vercel's serverless entry points — see below
+demo.mp4      screen recording
+README.md     this file
+```
+
+All the code lives in two folders: **`frontend/`** and **`backend/`**.
+
+`api/` is not a third component. Vercel only creates serverless functions from an `api/`
+directory at the **repo root** — putting them in `backend/api/` fails the build outright:
+
+```
+The pattern "backend/api/*.js" defined in `functions` doesn't match any
+Serverless Functions inside the `api` directory.
+```
+
+So those four files are entry points and nothing else — each is a two-line re-export of a handler
+from `backend/`. Every line of real logic is in `backend/`.
+
+The study-set schema sits in `backend/shared/` because the backend owns the contract. The
+frontend imports it through a `@contract` alias (see `frontend/vite.config.js`), so both halves
+validate against the same definition rather than two copies that can drift.
+
 ---
 
 ## Setup
@@ -59,7 +90,7 @@ The project is Vercel-ready. Two pieces:
 - `api/health.js`, `api/study-set.js` and `api/refine.js` are serverless functions
 
 Locally the same routes are served by Express. **Both transports call straight into
-`server/pipeline.js`**, so there is exactly one implementation of "turn text into a validated
+`backend/pipeline.js`**, so there is exactly one implementation of "turn text into a validated
 study set" and no chance of the two drifting apart. The handlers under `api/` are ~5 lines each.
 
 ### Deploy
@@ -103,7 +134,7 @@ vercel --prod
   not reach the model provider". The real cause was in the function logs: `Cannot convert
   argument to a ByteString because the character at index 7 has a value of 65279` — U+FEFF, a
   byte-order mark, prefixed onto the key by the shell pipeline that set the variable. `Bearer `
-  is seven characters, so index 7 was the first character of the key. `server/groq.js` now
+  is seven characters, so index 7 was the first character of the key. `backend/groq.js` now
   strips BOMs, wrapping quotes and whitespace before building the header, and logs the
   underlying `cause` of any transport failure so this is one log line to diagnose next time
   rather than a guess.
@@ -126,18 +157,18 @@ free-form text
 
 | Path | Role |
 |---|---|
-| `server/pipeline.js` | The whole request pipeline, independent of transport |
-| `server/index.js` | Express routes for local dev — transport only |
+| `backend/pipeline.js` | The whole request pipeline, independent of transport |
+| `backend/server.js` | Express routes for local dev — transport only |
 | `api/*.js` | The same routes as Vercel serverless functions |
-| `server/groq.js` | Provider call; maps every HTTP/network failure to a typed error |
-| `server/prompt.js` | System prompt, schema contract, refinement + repair prompts |
-| `shared/extractJson.js` | Tolerant JSON extraction (shared by server and client) |
-| `shared/normalize.js` | Shape repair, validation, `isValidStudySet` guard |
-| `src/hooks/useStudySet.js` | Request lifecycle, race protection, retry/cancel |
-| `src/hooks/useStudyProgress.js` | Per-card known/review state, shared by three views |
-| `src/components/` | Prompt form, flashcards, browse grid, quiz, states, refinement |
+| `backend/groq.js` | Provider call; maps every HTTP/network failure to a typed error |
+| `backend/prompt.js` | System prompt, schema contract, refinement + repair prompts |
+| `backend/shared/extractJson.js` | Tolerant JSON extraction (shared by server and client) |
+| `backend/shared/normalize.js` | Shape repair, validation, `isValidStudySet` guard |
+| `frontend/src/hooks/useStudySet.js` | Request lifecycle, race protection, retry/cancel |
+| `frontend/src/hooks/useStudyProgress.js` | Per-card known/review state, shared by three views |
+| `frontend/src/components/` | Prompt form, flashcards, browse grid, quiz, states, refinement |
 
-`shared/` is imported by both sides, so "what a valid study set is" is defined exactly once.
+`backend/shared/` is imported by both sides, so "what a valid study set is" is defined exactly once.
 
 ---
 
@@ -149,7 +180,7 @@ This is the part the assignment cares about most, so here is what actually happe
 syntax. It says nothing about whether the object has the fields we need. Everything below assumes
 the model will get it wrong.
 
-### 1. Tolerant parsing — `shared/extractJson.js`
+### 1. Tolerant parsing — `backend/shared/extractJson.js`
 
 Four strategies, cheapest first, stopping at the first one that parses:
 
@@ -164,7 +195,7 @@ Four strategies, cheapest first, stopping at the first one that parses:
 
 Step 4 means a response cut off mid-object still yields the cards that did arrive.
 
-### 2. Shape repair — `shared/normalize.js`
+### 2. Shape repair — `backend/shared/normalize.js`
 
 The rule is **salvage, don't reject**. Eight good flashcards and two broken ones should give the
 user eight flashcards, not an error screen.
@@ -361,7 +392,7 @@ is rather than defaulting to generic dashboard chrome.
 
 ### Per-set colour identity
 
-Every study set derives its own accent hue from its title (`src/lib/hue.js`), applied as `--hue`
+Every study set derives its own accent hue from its title (`frontend/src/lib/hue.js`), applied as `--hue`
 on the app root so rings, tabs, highlights, ruled lines and the ambient backdrop all shift
 together. It's a stable hash, so reopening a saved session brings back the same colour and "the
 blue set" stays a usable way to think about it.
@@ -446,7 +477,7 @@ in, and iterated on the parts that mattered. Specific things worth calling out:
   - The single-key-object fallback in the card parser was too greedy: `{front: "no back"}` became a
     card reading *"front / no back"* instead of being dropped. Now guarded against known field
     names.
-- The prompts in `server/prompt.js` were rewritten by hand after the model kept returning 1-based
+- The prompts in `backend/prompt.js` were rewritten by hand after the model kept returning 1-based
   `answerIndex` values.
 
 I also used AI for CSS scaffolding. Every file here is one I can walk through and extend.
@@ -465,7 +496,7 @@ I also used AI for CSS scaffolding. Every file here is one I can walk through an
   model.
 - **Study progress isn't persisted.** Saved sessions restore the cards and questions, not which
   ones you'd marked known.
-- **Single-provider.** Only Groq. The provider call is isolated in `server/groq.js`, so swapping it
+- **Single-provider.** Only Groq. The provider call is isolated in `backend/groq.js`, so swapping it
   is a contained change, but there's no abstraction layer.
 - **Groq's free tier rate-limits quickly.** Generating and then immediately refining a set can
   trip a 429 — refinement sends the whole set back, so it's a token-heavy request. The app

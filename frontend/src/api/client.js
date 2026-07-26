@@ -1,4 +1,7 @@
-import { isValidStudySet } from '../../shared/normalize.js';
+// The study-set schema is the contract between the two halves of the app. It
+// is defined once, on the backend, and imported here through the `@contract`
+// alias so the client validates against the same definition the server does.
+import { isValidStudySet } from '@contract/normalize.js';
 
 /** An error we can show the user, with enough detail to decide about retrying. */
 export class ApiError extends Error {

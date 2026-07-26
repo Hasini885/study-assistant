@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { healthPayload } from '../server/pipeline.js';
+import { healthPayload } from '../backend/pipeline.js';
 
 /** GET /api/health — lets the UI warn when no API key is configured. */
 export default function handler(req, res) {

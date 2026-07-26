@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { isValidStudySet } from '../../shared/normalize.js';
+import { isValidStudySet } from '@contract/normalize.js';
 
 const STORAGE_KEY = 'study-assistant:sessions:v1';
 const MAX_SESSIONS = 12;

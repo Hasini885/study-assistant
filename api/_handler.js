@@ -1,15 +1,20 @@
 /**
  * Shared plumbing for the Vercel serverless functions.
  *
- * Files under `api/` whose names start with an underscore are not turned into
- * routes, so this is a safe place for helpers.
+ * WHY THIS FOLDER IS AT THE REPO ROOT
+ * Vercel only creates serverless functions from an `api/` directory at the root
+ * of the project. Moving these into `backend/` fails the build outright:
+ *   "The pattern backend/api/*.js defined in functions doesn't match any
+ *    Serverless Functions inside the api directory."
+ * So `api/` is Vercel's entry point, deliberately kept as thin as possible —
+ * every line of real logic lives in `backend/`.
  *
- * All real logic lives in `server/pipeline.js`, shared with the local Express
- * server — these handlers are transport only.
+ * Files here whose names start with an underscore are not turned into routes,
+ * so this is a safe place for helpers.
  */
 
 import 'dotenv/config'; // no-op in production; lets `vercel dev` read .env
-import { errorResponse, generateStudySet } from '../server/pipeline.js';
+import { errorResponse, generateStudySet } from '../backend/pipeline.js';
 
 /**
  * @param {(body: unknown) => {messages: Array, topic: string}} build

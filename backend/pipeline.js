@@ -9,8 +9,8 @@
 
 import { callGroq, hasApiKey, UpstreamError } from './groq.js';
 import { buildGenerateMessages, buildRefineMessages, buildRepairMessages } from './prompt.js';
-import { extractJson } from '../shared/extractJson.js';
-import { normalizeStudySet, isValidStudySet } from '../shared/normalize.js';
+import { extractJson } from './shared/extractJson.js';
+import { normalizeStudySet, isValidStudySet } from './shared/normalize.js';
 
 const MAX_INPUT_CHARS = 20_000;
 const MAX_ATTEMPTS = 2; // one initial call, one self-repair

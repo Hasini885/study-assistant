@@ -1,3 +1,4 @@
+import 'dotenv/config'; // so a custom PORT in .env reaches the proxy target below
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 

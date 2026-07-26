@@ -68,7 +68,6 @@ free-form text
 | `server/index.js` | API routes, the two-attempt generate pipeline, cancellation |
 | `server/groq.js` | Provider call; maps every HTTP/network failure to a typed error |
 | `server/prompt.js` | System prompt, schema contract, refinement + repair prompts |
-| `server/simulate.js` | Failure injection for development |
 | `shared/extractJson.js` | Tolerant JSON extraction (shared by server and client) |
 | `shared/normalize.js` | Shape repair, validation, `isValidStudySet` guard |
 | `src/hooks/useStudySet.js` | Request lifecycle, race protection, retry/cancel |
@@ -156,22 +155,23 @@ A failed *refinement* keeps the existing set on screen and shows a dismissible b
 Only a failure with nothing to fall back on takes over the page. An `ErrorBoundary` catches any
 render-time crash so the worst case is still not a blank page.
 
-### 7. Try it yourself
+### 7. Where this is proven
 
-With `npm start` running, use the **"Test failure handling"** dropdown in the footer (development
-only — the server refuses simulations when `NODE_ENV=production`). It makes the next request
-return a specific kind of broken response:
+`npm test` runs 36 tests over exactly these paths — every recovery strategy and every repair
+rule, each one written against output a model actually produced:
 
-| Mode | What you should see |
+| Covered | Examples |
 |---|---|
-| Truncated / unparseable JSON | Partial set recovered, banner explains |
-| JSON wrapped in prose and fences | Clean set, banner notes the recovery |
-| Valid JSON, wrong schema | Retry, then a clear error with Try again |
-| Half the items are malformed | Good items render, bad ones reported as skipped |
-| Answers as letters / 1-based / text | All resolved to the right option |
-| Valid but empty set | "Not enough to work with" |
-| Very slow response (12s) | Skeletons, live timer, working Cancel button |
-| Provider 500 / 429 | Typed error with the right message and Retry |
+| Extraction | fenced JSON, prose wrappers, braces inside strings, escaped quotes, trailing commas, smart quotes, `NaN`, truncated mid-object |
+| Shape repair | key aliases, envelopes, bare arrays, tuple and `"term - definition"` cards, missing sides, duplicates |
+| Answer keys | letters, `(b)`, option text, labelled option text, 1-based indices, `{text, correct}` objects |
+| Rejection | unanswerable questions, fewer than two distinct options, off-schema objects, deliberately empty sets |
+| End to end | a truncated response becoming a shorter but valid study set |
+
+During development these paths were also exercised through a failure-injection mode on the
+server that returned deliberately broken responses on demand. That has been removed now the
+behaviour is locked down by tests — it was a scaffold, not a feature, and shipping a switch that
+makes the app fail on purpose is not something a user should find.
 
 ---
 
@@ -253,7 +253,8 @@ doesn't exist.
 
 ## Features
 
-- Free-form textarea (⌘/Ctrl+Enter to submit), with adjustable card and question counts.
+- Free-form textarea (⌘/Ctrl+Enter to submit). Set size is fixed at 8 cards and 5 questions —
+  more knobs did not make the tool better, and a predictable size keeps the wait short.
 - **Flashcards** — 3D flip, **drag or swipe sideways** to move between cards (the card follows
   your pointer and snaps back if you don't cross the threshold), shuffle, mark *Got it* /
   *Review later*, filter to drill only the flagged ones, and a **jump bar** of ticks coloured by

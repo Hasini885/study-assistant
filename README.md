@@ -195,8 +195,27 @@ your progress panel and session list stay put while you work through a long set.
 shell unwinds into normal document flow and the sidebar becomes an overlay drawer behind the ☰
 button (closes on Escape, on the scrim, or when you load a session).
 
-Before anything is generated the workspace shows a hero prompt instead, and the sidebar is just
-your saved sessions — no point showing a progress ring for a set that doesn't exist.
+The workspace is **full-bleed** — no fixed content cap. Side padding scales with the viewport
+(`clamp(20px, 3.5vw, 56px)`) so a wider monitor buys more study surface rather than more empty
+margin, and the extra width is spent on layout that earns it:
+
+- **≥1100px** — the deck splits into the card plus a **card rail**: a scrollable list of every
+  card in the current view, current one highlighted, status dot each, click to jump. The rail
+  supersedes the compact jump bar rather than duplicating it.
+- **≥1000px** — quiz answers lay out in two columns, so four options and the feedback panel fit
+  without scrolling.
+- The card itself grows with the window (`clamp(300px, 44vh, 480px)`), so a tall screen gets a
+  bigger card, not a bigger gap.
+
+The **⤢ button** in the topbar goes native fullscreen for distraction-free study. It's hidden
+where the API isn't usable (iOS Safari exposes it on video elements only), and its state is read
+back from the document so pressing Esc — which the app never sees as a click — keeps the label
+honest.
+
+The hero is the one thing still centred and measured at 860px: a textarea the width of a 4K
+monitor would be worse, not better. Before anything is generated the workspace shows that hero
+and the sidebar is just your saved sessions — no point showing a progress ring for a set that
+doesn't exist.
 
 ## Features
 
@@ -204,7 +223,7 @@ your saved sessions — no point showing a progress ring for a set that doesn't 
 - **Flashcards** — 3D flip, **drag or swipe sideways** to move between cards (the card follows
   your pointer and snaps back if you don't cross the threshold), shuffle, mark *Got it* /
   *Review later*, filter to drill only the flagged ones, and a **jump bar** of ticks coloured by
-  status so you can leap to any card.
+  status so you can leap to any card — swapped for a full card rail on wide screens.
 - **Browse** — the whole set as a grid. Tiles flip in place independently, filter by
   All / Unseen / Known / To review, reveal every answer at once, or hit *Study* on a tile to drop
   into the deck at exactly that card.
@@ -217,8 +236,8 @@ your saved sessions — no point showing a progress ring for a set that doesn't 
   set instead of regenerating from scratch.
 - **Save & reload sessions** — localStorage, validated on read (storage is treated as untrusted).
 - Loading skeletons, typed error states, empty states.
-- Dark / light / system theme, keyboard navigation (←/→, 1–9, Space, Enter), mobile layout,
-  `prefers-reduced-motion` support.
+- Dark / light / system theme, native fullscreen toggle, keyboard navigation (←/→, 1–9, Space,
+  Enter), mobile layout, `prefers-reduced-motion` support.
 
 Card progress lives in `useStudyProgress` at the app level rather than inside the deck, because
 the deck, the browse grid and the sidebar panel all read and write it. Card ids are regenerated

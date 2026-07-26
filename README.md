@@ -49,6 +49,57 @@ talks to Groq. `.env` is gitignored.
 
 ---
 
+## Deploying to Vercel
+
+The project is Vercel-ready. Two pieces:
+
+- the Vite build is served as static files from `dist`
+- `api/health.js`, `api/study-set.js` and `api/refine.js` are serverless functions
+
+Locally the same routes are served by Express. **Both transports call straight into
+`server/pipeline.js`**, so there is exactly one implementation of "turn text into a validated
+study set" and no chance of the two drifting apart. The handlers under `api/` are ~5 lines each.
+
+### Deploy
+
+```bash
+# 1. push to GitHub
+git remote add origin https://github.com/<you>/study-assistant.git
+git push -u origin main
+```
+
+Then on [vercel.com/new](https://vercel.com/new), import the repo. The Vite preset is detected
+automatically. Before the first deploy, add one environment variable:
+
+| Name | Value |
+|---|---|
+| `GROQ_API_KEY` | your key from [console.groq.com/keys](https://console.groq.com/keys) |
+
+Or from the CLI:
+
+```bash
+npm i -g vercel
+vercel login
+vercel link
+vercel env add GROQ_API_KEY production
+vercel --prod
+```
+
+### Things that matter in production
+
+- **Function duration.** `vercel.json` sets `maxDuration: 60`. A single request can make two
+  model calls (one generate, one self-repair), so `REQUEST_TIMEOUT_MS` defaults to 25s — worst
+  case 50s, comfortably inside the limit. If your plan caps duration lower, drop
+  `REQUEST_TIMEOUT_MS` to match, otherwise the platform kills the function and the user gets an
+  opaque gateway error instead of the app's own "the model timed out" message.
+- **Node 20+** is required (`AbortSignal.any`), pinned via `engines` in `package.json`.
+- **There is no auth or rate limiting.** Anyone with the URL can spend your Groq quota. Fine for
+  a portfolio link; add rate limiting before it goes anywhere real.
+- **Rotate your key** if it has ever been pasted somewhere it shouldn't be — deploying makes it
+  live.
+
+---
+
 ## How it works
 
 ```
@@ -65,7 +116,9 @@ free-form text
 
 | Path | Role |
 |---|---|
-| `server/index.js` | API routes, the two-attempt generate pipeline, cancellation |
+| `server/pipeline.js` | The whole request pipeline, independent of transport |
+| `server/index.js` | Express routes for local dev — transport only |
+| `api/*.js` | The same routes as Vercel serverless functions |
 | `server/groq.js` | Provider call; maps every HTTP/network failure to a typed error |
 | `server/prompt.js` | System prompt, schema contract, refinement + repair prompts |
 | `shared/extractJson.js` | Tolerant JSON extraction (shared by server and client) |

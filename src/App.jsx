@@ -4,6 +4,7 @@ import { fetchHealth } from './api/client.js';
 import { useStudySet } from './hooks/useStudySet.js';
 import { useSessions } from './hooks/useSessions.js';
 import { useStudyProgress } from './hooks/useStudyProgress.js';
+import { useFullscreen } from './hooks/useFullscreen.js';
 import { useTheme } from './hooks/useTheme.js';
 
 import { PromptForm } from './components/PromptForm.jsx';
@@ -11,12 +12,13 @@ import { StudySetView } from './components/StudySetView.jsx';
 import { ProgressPanel } from './components/ProgressPanel.jsx';
 import { SessionList } from './components/SessionList.jsx';
 import { EmptyState, ErrorBanner, ErrorState, LoadingState } from './components/States.jsx';
-import { SimulationMenu, ThemeToggle } from './components/DevTools.jsx';
+import { FullscreenToggle, SimulationMenu, ThemeToggle } from './components/DevTools.jsx';
 
 const NO_CARDS = []; // stable identity so progress memos don't churn
 
 export default function App() {
   const { theme, cycleTheme } = useTheme();
+  const fullscreen = useFullscreen();
   const { sessions, saveSession, deleteSession } = useSessions();
   const study = useStudySet();
 
@@ -137,6 +139,11 @@ export default function App() {
               New set
             </button>
           )}
+          <FullscreenToggle
+            isFullscreen={fullscreen.isFullscreen}
+            onToggle={fullscreen.toggle}
+            supported={fullscreen.supported}
+          />
           <ThemeToggle theme={theme} onCycle={cycleTheme} />
         </div>
       </header>

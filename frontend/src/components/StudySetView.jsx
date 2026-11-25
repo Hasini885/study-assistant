@@ -6,6 +6,8 @@ import { RepairNotice } from './States.jsx';
 import { GroundingSummary } from './SourceBadge.jsx';
 import { hashString } from '@contract/ids.js';
 import { explainAnswer } from '../api/client.js';
+import { SetActions } from './SetActions.jsx';
+import { PrintableSet } from './PrintableSet.jsx';
 
 const REFINE_EXAMPLES = ['Make the questions harder', 'Add 3 cards about definitions', 'Simplify the wording'];
 
@@ -87,10 +89,15 @@ export function StudySetView({
           {studySet.summary && <p className="workspace__summary">{studySet.summary}</p>}
           <GroundingSummary grounding={meta?.grounding} />
         </div>
-        <button type="button" className="btn btn--small" onClick={onSave} disabled={saveState === 'saved'}>
-          {saveState === 'saved' ? 'Saved ✓' : 'Save session'}
-        </button>
+        <div className="workspace__actions">
+          <SetActions studySet={studySet} />
+          <button type="button" className="btn btn--small" onClick={onSave} disabled={saveState === 'saved'}>
+            {saveState === 'saved' ? 'Saved ✓' : 'Save session'}
+          </button>
+        </div>
       </header>
+
+      <PrintableSet studySet={studySet} />
 
       <RepairNotice repairs={meta?.repairs} onRegenerate={onRegenerate} />
 

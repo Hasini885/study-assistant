@@ -9,6 +9,8 @@ import { useFullscreen } from './hooks/useFullscreen.js';
 import { useTheme } from './hooks/useTheme.js';
 import { useNow } from './hooks/useNow.js';
 import { collectDue, dueCountsBySession, gradeRecord } from './lib/sessionStore.js';
+import { decodeShareFragment, isShareFragment } from './lib/share.js';
+import { hasSeenIntro, markIntroSeen } from './lib/intro.js';
 
 import { Landing } from './components/Landing.jsx';
 import { PromptForm } from './components/PromptForm.jsx';
@@ -34,7 +36,9 @@ export default function App() {
   const [activeSessionId, setActiveSessionId] = useState(null);
   const [quizStats, setQuizStats] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [entered, setEntered] = useState(false);
+  // Returning visitors skip the landing page; a share link skips it too.
+  const [entered, setEntered] = useState(() => hasSeenIntro() || isShareFragment(window.location.hash));
+  const [shareError, setShareError] = useState(null);
   // 'study' is the normal workspace; 'due' is the cross-session review queue.
   const [view, setView] = useState('study');
   const [dueRun, setDueRun] = useState({ id: 0, queue: [] });
@@ -98,6 +102,42 @@ export default function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [sidebarOpen]);
+
+  const enter = useCallback(() => {
+    markIntroSeen();
+    setEntered(true);
+  }, []);
+
+  // Open a set shared by link (#set=…). Also listens for hashchange, so
+  // pasting a second link into the same tab works without a reload.
+  const { load } = study;
+  useEffect(() => {
+    let cancelled = false;
+    const importFromHash = async () => {
+      if (!isShareFragment(window.location.hash)) return;
+      const result = await decodeShareFragment(window.location.hash);
+      if (cancelled) return;
+      // Clear the fragment: a reload shouldn't re-import over what you've done since.
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+      setEntered(true);
+      if (!result.ok) {
+        setShareError(result.reason);
+        return;
+      }
+      setShareError(null);
+      setActiveSessionId(null);
+      setDraftProgress(NO_PROGRESS);
+      setView('study');
+      lastInputRef.current = '';
+      load(result.studySet, { repairs: [], shared: true });
+    };
+    importFromHash();
+    window.addEventListener('hashchange', importFromHash);
+    return () => {
+      cancelled = true;
+      window.removeEventListener('hashchange', importFromHash);
+    };
+  }, [load]);
 
   const busy = study.status === 'loading' || study.status === 'refining';
   const hasSet = Boolean(study.studySet);
@@ -190,16 +230,16 @@ export default function App() {
   if (!entered) {
     return (
       <Landing
-        onEnter={() => setEntered(true)}
+        onEnter={enter}
         recentSession={sessions[0]}
         dueCount={dueItems.length}
         onReviewDue={() => {
           startDueReview();
-          setEntered(true);
+          enter();
         }}
         onResume={(session) => {
           handleLoadSession(session);
-          setEntered(true);
+          enter();
         }}
       />
     );
@@ -268,11 +308,12 @@ export default function App() {
             dueBySession={dueBySession}
           />
 
-          {health?.model && (
-            <div className="sidebar__footer">
-              <span className="sidebar__model">model: {health.model}</span>
-            </div>
-          )}
+          <div className="sidebar__footer">
+            {health?.model && <span className="sidebar__model">model: {health.model}</span>}
+            <button type="button" className="link-button sidebar__replay" onClick={() => setEntered(false)}>
+              Replay intro
+            </button>
+          </div>
         </aside>
 
         <main className="main">
@@ -284,6 +325,20 @@ export default function App() {
                   Copy <code>.env.example</code> to <code>.env</code>, add <code>GROQ_API_KEY</code>, and restart
                   the server.
                 </span>
+              </div>
+            </div>
+          )}
+
+          {shareError && (
+            <div className="banner banner--error" role="alert">
+              <div className="banner__body">
+                <strong>Couldn’t open that link</strong>
+                <span>{shareError}</span>
+              </div>
+              <div className="banner__actions">
+                <button type="button" className="btn btn--small btn--ghost" onClick={() => setShareError(null)}>
+                  Dismiss
+                </button>
               </div>
             </div>
           )}

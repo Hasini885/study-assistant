@@ -97,17 +97,19 @@ export function buildRefineMessages({ studySet, instruction }) {
       title: studySet.title,
       summary: studySet.summary,
       flashcards: studySet.flashcards.map(({ id, front, back, hint, source }) => ({ id, front, back, hint, source })),
-      quiz: studySet.quiz.map(({ id, type, question, options, answerIndex, answer, accepted, explanation, source }) => ({
-        id,
-        type: type ?? 'mcq',
-        question,
-        options,
-        answerIndex,
-        answer,
-        accepted,
-        explanation,
-        source,
-      })),
+      quiz: studySet.quiz.map(
+        ({ id, type, question, options, answerIndex, answer, accepted, explanation, source }) => ({
+          id,
+          type: type ?? 'mcq',
+          question,
+          options,
+          answerIndex,
+          answer,
+          accepted,
+          explanation,
+          source,
+        })
+      ),
     },
     null,
     2

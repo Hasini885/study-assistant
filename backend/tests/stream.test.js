@@ -71,7 +71,10 @@ test('callGroqStream reassembles content from events split across reads', async 
   assert.equal(result.content, FULL);
   assert.equal(result.finishReason, 'stop');
   assert.ok(seen.length > 10);
-  assert.ok(seen.every((text, i) => i === 0 || text.startsWith(seen[i - 1])), 'onText sees a growing prefix');
+  assert.ok(
+    seen.every((text, i) => i === 0 || text.startsWith(seen[i - 1])),
+    'onText sees a growing prefix'
+  );
 });
 
 test('callGroqStream reports a broken stream as stream_failed', async (t) => {
@@ -81,19 +84,25 @@ test('callGroqStream reports a broken stream as stream_failed', async (t) => {
 });
 
 test('callGroqStream surfaces an error event from the provider', async (t) => {
-  t.mock.method(globalThis, 'fetch', async () => sseResponse([`data: ${JSON.stringify({ error: { message: 'overloaded' } })}\n\n`]));
+  t.mock.method(globalThis, 'fetch', async () =>
+    sseResponse([`data: ${JSON.stringify({ error: { message: 'overloaded' } })}\n\n`])
+  );
   await assert.rejects(callGroqStream({ messages: [] }), /overloaded/);
 });
 
 test('callGroqStream maps HTTP failures like the plain call does', async (t) => {
   t.mock.method(globalThis, 'fetch', async () => json({ error: { message: 'slow down' } }, 429));
-  await assert.rejects(callGroqStream({ messages: [] }), (error) => error.code === 'rate_limited' && error.status === 429);
+  await assert.rejects(
+    callGroqStream({ messages: [] }),
+    (error) => error.code === 'rate_limited' && error.status === 429
+  );
 });
 
 /* ------------------------------ partialStudySet ---------------------------- */
 
 test('partialStudySet holds back the flashcard still being written', () => {
-  const text = '{"title":"Bio","flashcards":[{"front":"What is ATP?","back":"Energy currency."},{"front":"What is DNA?","back":"Gene';
+  const text =
+    '{"title":"Bio","flashcards":[{"front":"What is ATP?","back":"Energy currency."},{"front":"What is DNA?","back":"Gene';
   const partial = partialStudySet(text);
   assert.deepEqual(
     partial.flashcards.map((c) => c.front),
@@ -169,7 +178,9 @@ test('a rate limit while streaming is not retried as a plain request', async (t)
   // dropping to a non-streamed call on the same model.
   const saved = process.env.GROQ_FALLBACK_MODEL;
   process.env.GROQ_FALLBACK_MODEL = 'none';
-  t.after(() => (saved === undefined ? delete process.env.GROQ_FALLBACK_MODEL : (process.env.GROQ_FALLBACK_MODEL = saved)));
+  t.after(() =>
+    saved === undefined ? delete process.env.GROQ_FALLBACK_MODEL : (process.env.GROQ_FALLBACK_MODEL = saved)
+  );
 
   let calls = 0;
   t.mock.method(globalThis, 'fetch', async () => {
@@ -280,7 +291,10 @@ test('streamStudySet reports a generation failure as an error event', async () =
     },
   });
   assert.deepEqual(res.events(), [
-    { event: 'error', data: { error: { code: 'timeout', message: 'The model took too long to respond.', retryable: true } } },
+    {
+      event: 'error',
+      data: { error: { code: 'timeout', message: 'The model took too long to respond.', retryable: true } },
+    },
   ]);
 });
 

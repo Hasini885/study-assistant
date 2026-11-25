@@ -178,7 +178,7 @@ export function RepairNotice({ repairs, onRegenerate }) {
   return (
     <div className="banner banner--warn">
       <div className="banner__body">
-        <strong>The model's output needed cleaning up</strong>
+        <strong>The model’s output needed cleaning up</strong>
         <ul className="banner__list">
           {repairs.map((repair, i) => (
             <li key={i}>{repair}</li>

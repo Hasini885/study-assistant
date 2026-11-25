@@ -43,7 +43,7 @@ export class UpstreamError extends Error {
  */
 function apiKey() {
   return (process.env.GROQ_API_KEY || '')
-    .replace(/^﻿/, '')
+    .replace(/^\uFEFF/, '')
     .trim()
     .replace(/^["']|["']$/g, '')
     .trim();
@@ -107,10 +107,20 @@ export async function callGroq({ messages, signal, model = primaryModel(), tempe
  * @param {(textSoFar: string) => void} [args.onText]
  * @returns {Promise<{content: string, finishReason: string | undefined, model: string}>}
  */
-export async function callGroqStream({ messages, signal, onText, model = primaryModel(), temperature = 0.3, maxTokens = 4096 }) {
+export async function callGroqStream({
+  messages,
+  signal,
+  onText,
+  model = primaryModel(),
+  temperature = 0.3,
+  maxTokens = 4096,
+}) {
   const response = await send({ model, messages, temperature, max_tokens: maxTokens, stream: true }, signal);
   if (!response.body) {
-    throw new UpstreamError('stream_failed', 'The model provider did not stream a response.', { status: 502, retryable: true });
+    throw new UpstreamError('stream_failed', 'The model provider did not stream a response.', {
+      status: 502,
+      retryable: true,
+    });
   }
 
   const reader = response.body.getReader();
@@ -129,7 +139,10 @@ export async function callGroqStream({ messages, signal, onText, model = primary
     try {
       chunk = JSON.parse(data);
     } catch {
-      throw new UpstreamError('stream_failed', 'The model provider sent a malformed stream.', { status: 502, retryable: true });
+      throw new UpstreamError('stream_failed', 'The model provider sent a malformed stream.', {
+        status: 502,
+        retryable: true,
+      });
     }
     if (chunk?.error) {
       throw new UpstreamError('upstream', chunk.error.message || 'The model provider reported an error.', {
@@ -179,7 +192,10 @@ export async function callGroqStream({ messages, signal, onText, model = primary
   }
 
   if (content.trim() === '') {
-    throw new UpstreamError('empty_completion', 'The model returned an empty response.', { status: 502, retryable: true });
+    throw new UpstreamError('empty_completion', 'The model returned an empty response.', {
+      status: 502,
+      retryable: true,
+    });
   }
   return { content, finishReason, model };
 }

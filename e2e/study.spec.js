@@ -18,10 +18,14 @@ function watchForErrors(page) {
 
 /** Mocked on the browser context, so every tab (a share link opened in a new one) gets it. */
 async function mockApi(page) {
-  await page.context().route('**/api/health', (route) => route.fulfill({ json: { ok: true, configured: true, model: 'mock' } }));
-  await page.context().route('**/api/study-set', (route) =>
-    route.fulfill({ status: 200, headers: { 'Content-Type': 'text/event-stream' }, body: eventStream(studySet) })
-  );
+  await page
+    .context()
+    .route('**/api/health', (route) => route.fulfill({ json: { ok: true, configured: true, model: 'mock' } }));
+  await page
+    .context()
+    .route('**/api/study-set', (route) =>
+      route.fulfill({ status: 200, headers: { 'Content-Type': 'text/event-stream' }, body: eventStream(studySet) })
+    );
 }
 
 async function generate(page) {

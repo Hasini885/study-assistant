@@ -13,7 +13,14 @@ export const studySet = {
       source: 'ATP is the energy currency of the cell',
       grounded: true,
     },
-    { id: 'c-mito', front: 'Where is most ATP made?', back: 'In the mitochondria.', hint: '', source: 'invented', grounded: false },
+    {
+      id: 'c-mito',
+      front: 'Where is most ATP made?',
+      back: 'In the mitochondria.',
+      hint: '',
+      source: 'invented',
+      grounded: false,
+    },
   ],
   quiz: [
     {
@@ -32,7 +39,14 @@ export const studySet = {
       answerIndex: 1,
       explanation: 'It is made in the mitochondria.',
     },
-    { id: 'q-3', type: 'blank', question: 'ATP stands for adenosine _____.', answer: 'triphosphate', accepted: [], explanation: '' },
+    {
+      id: 'q-3',
+      type: 'blank',
+      question: 'ATP stands for adenosine _____.',
+      answer: 'triphosphate',
+      accepted: [],
+      explanation: '',
+    },
   ],
 };
 

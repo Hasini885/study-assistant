@@ -15,7 +15,9 @@ function seed() {
   };
   window.localStorage.setItem(
     STORAGE_KEY,
-    JSON.stringify([{ id: 's-1', title: 'Cell biology', savedAt: yesterday, counts: {}, studySet, meta: null, progress }])
+    JSON.stringify([
+      { id: 's-1', title: 'Cell biology', savedAt: yesterday, counts: {}, studySet, meta: null, progress },
+    ])
   );
 }
 

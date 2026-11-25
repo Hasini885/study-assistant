@@ -40,7 +40,10 @@
   border-left: 3px solid var(--border-strong);
   border-radius: 12px;
   overflow: hidden;
-  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    transform 0.15s,
+    box-shadow 0.15s;
 }
 
 .tile:hover {

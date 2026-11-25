@@ -123,7 +123,7 @@ function headerValue(headers, name) {
 /** Same passengers as the Groq key: a BOM, whitespace, wrapping quotes. */
 function cleanEnvValue(value) {
   return String(value ?? '')
-    .replace(/^﻿/, '')
+    .replace(/^\uFEFF/, '')
     .trim()
     .replace(/^["']|["']$/g, '')
     .trim();

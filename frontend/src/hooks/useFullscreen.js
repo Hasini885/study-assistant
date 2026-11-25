@@ -13,8 +13,7 @@ export function useFullscreen() {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const supported =
-    typeof document !== 'undefined' &&
-    Boolean(document.fullscreenEnabled ?? document.webkitFullscreenEnabled);
+    typeof document !== 'undefined' && Boolean(document.fullscreenEnabled ?? document.webkitFullscreenEnabled);
 
   useEffect(() => {
     const sync = () => setIsFullscreen(Boolean(document.fullscreenElement ?? document.webkitFullscreenElement));

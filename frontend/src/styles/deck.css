@@ -72,7 +72,9 @@
   border-radius: 8px;
   padding: 7px 9px;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 
 .rail__item:hover {
@@ -178,7 +180,9 @@
 }
 
 .deck__stage:hover .card__face {
-  box-shadow: var(--shadow-lg), 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+  box-shadow:
+    var(--shadow-lg),
+    0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 .card__face--back {
@@ -272,7 +276,9 @@
   border-radius: 999px;
   background: var(--border-strong);
   cursor: pointer;
-  transition: background 0.15s, transform 0.15s;
+  transition:
+    background 0.15s,
+    transform 0.15s;
 }
 
 .jumpbar__tick:hover {

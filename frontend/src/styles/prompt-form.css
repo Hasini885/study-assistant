@@ -96,7 +96,10 @@
   padding: 5px 11px;
   cursor: pointer;
   text-align: left;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
 }
 
 .chip:hover:not(:disabled) {

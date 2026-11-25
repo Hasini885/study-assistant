@@ -229,7 +229,11 @@ test('studySetLimitViolation accepts anything the normalizer produced, even at t
   const result = normalizeStudySet({
     title: 't'.repeat(1000),
     summary: 's'.repeat(1000),
-    flashcards: Array.from({ length: 60 }, (_, i) => ({ front: `${i} ${'f'.repeat(900)}`, back: 'b'.repeat(900), hint: 'h'.repeat(900) })),
+    flashcards: Array.from({ length: 60 }, (_, i) => ({
+      front: `${i} ${'f'.repeat(900)}`,
+      back: 'b'.repeat(900),
+      hint: 'h'.repeat(900),
+    })),
     quiz: Array.from({ length: 40 }, (_, i) => ({
       question: `${i} ${'q'.repeat(900)}`,
       options: Array.from({ length: 9 }, (__, n) => `${n} ${'o'.repeat(900)}`),
@@ -276,7 +280,10 @@ test('studySetLimitViolation rejects over-long strings in every field', () => {
 test('studySetLimitViolation rejects non-text values that would crash the UI', () => {
   // An object among the options would crash the UI when rendered, so the
   // shape check itself refuses it.
-  assert.equal(studySetLimitViolation(validSet({ quiz: [{ ...goodQuestion, options: ['a', { evil: true }] }] })), 'an invalid shape');
+  assert.equal(
+    studySetLimitViolation(validSet({ quiz: [{ ...goodQuestion, options: ['a', { evil: true }] }] })),
+    'an invalid shape'
+  );
   assert.equal(isValidStudySet(validSet({ quiz: [{ ...goodQuestion, options: ['a', { evil: true }] }] })), false);
   assert.match(studySetLimitViolation(validSet({ title: 42 })), /non-text value for the title/);
 });
@@ -298,7 +305,10 @@ test('ids are derived from content, so normalizing twice gives the same ids', ()
 });
 
 test('a well-formed id sent by the model is kept', () => {
-  const result = normalizeStudySet({ flashcards: [{ ...goodCard, id: 'card-0-7' }], quiz: [{ ...goodQuestion, id: 'q-3' }] });
+  const result = normalizeStudySet({
+    flashcards: [{ ...goodCard, id: 'card-0-7' }],
+    quiz: [{ ...goodQuestion, id: 'q-3' }],
+  });
   assert.equal(result.data.flashcards[0].id, 'card-0-7');
   assert.equal(result.data.quiz[0].id, 'q-3');
 });
@@ -310,7 +320,10 @@ test('malformed or duplicate ids from the model are replaced', () => {
       { front: 'Second', back: 'card', id: 'dup' },
       { front: 'Third', back: 'card', id: 'dup' },
     ],
-    quiz: [{ ...goodQuestion, id: 42 }, { ...goodQuestion, question: 'Same text?', id: 'dup' }],
+    quiz: [
+      { ...goodQuestion, id: 42 },
+      { ...goodQuestion, question: 'Same text?', id: 'dup' },
+    ],
   });
   const ids = result.data.flashcards.map((c) => c.id);
   assert.match(ids[0], /^c-/);
@@ -323,7 +336,10 @@ test('malformed or duplicate ids from the model are replaced', () => {
 
 test('a source quote from the model is kept, under any of its aliases', () => {
   const result = normalizeStudySet({
-    flashcards: [{ ...goodCard, source: '  ATP is the  energy currency ' }, { front: 'B', back: 'b', quote: 'from notes' }],
+    flashcards: [
+      { ...goodCard, source: '  ATP is the  energy currency ' },
+      { front: 'B', back: 'b', quote: 'from notes' },
+    ],
     quiz: [{ ...goodQuestion, evidence: 'It happens in the stroma.' }],
   });
   assert.equal(result.data.flashcards[0].source, 'ATP is the energy currency');
@@ -344,7 +360,10 @@ test('a grounded flag from the model is ignored: only the server sets it', () =>
 
 test('over-long sources are truncated, and non-text ones dropped', () => {
   const result = normalizeStudySet({
-    flashcards: [{ ...goodCard, source: 's'.repeat(2000) }, { front: 'B', back: 'b', source: { nope: 1 } }],
+    flashcards: [
+      { ...goodCard, source: 's'.repeat(2000) },
+      { front: 'B', back: 'b', source: { nope: 1 } },
+    ],
   });
   assert.ok(result.data.flashcards[0].source.length <= LIMITS.source);
   assert.equal('source' in result.data.flashcards[1], false);

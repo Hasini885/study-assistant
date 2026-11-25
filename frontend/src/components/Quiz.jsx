@@ -68,7 +68,11 @@ export function quizReducer(state, action) {
   switch (action.type) {
     case 'select': {
       if (state.answered || !question || quizType(question) === 'blank') return state; // answers are final
-      if (!Number.isInteger(action.optionIndex) || action.optionIndex < 0 || action.optionIndex >= question.options.length) {
+      if (
+        !Number.isInteger(action.optionIndex) ||
+        action.optionIndex < 0 ||
+        action.optionIndex >= question.options.length
+      ) {
         return state;
       }
       return record(state, question, action.optionIndex, action.optionIndex === question.answerIndex);
@@ -267,12 +271,19 @@ export function Quiz({ questions, onRoundComplete, onExplain }) {
       )}
 
       <div className="quiz__actions">
-        <button type="button" className="btn btn--primary" onClick={() => dispatch({ type: 'next' })} disabled={!answered}>
+        <button
+          type="button"
+          className="btn btn--primary"
+          onClick={() => dispatch({ type: 'next' })}
+          disabled={!answered}
+        >
           {state.index >= state.queue.length - 1 ? 'See results' : 'Next question'}
         </button>
         {!answered && (
           <span className="quiz__hint">
-            {kind === 'blank' ? 'Type your answer and press Enter.' : `Pick an answer — or press 1–${question.options.length}.`}
+            {kind === 'blank'
+              ? 'Type your answer and press Enter.'
+              : `Pick an answer — or press 1–${question.options.length}.`}
           </span>
         )}
       </div>
@@ -300,7 +311,7 @@ function BlankAnswer({ answered, result, onSubmit, onNext }) {
       <input
         ref={inputRef}
         className={`blank__input ${answered ? (result?.correct ? 'is-correct' : 'is-wrong') : ''}`}
-        value={answered ? result?.chosen ?? text : text}
+        value={answered ? (result?.chosen ?? text) : text}
         onChange={(event) => setText(event.target.value)}
         onKeyDown={(event) => {
           // Once answered, Enter moves on like everywhere else in the quiz.
@@ -381,7 +392,12 @@ function QuizResults({ results, round, correctCount, wrongCount, bestStreak, onR
       <Confetti trigger={perfect} />
 
       <div className="results__score">
-        <div className="results__ring" style={{ '--pct': shownPercent }} role="img" aria-label={`${percent} percent correct`}>
+        <div
+          className="results__ring"
+          style={{ '--pct': shownPercent }}
+          role="img"
+          aria-label={`${percent} percent correct`}
+        >
           <span>{Math.round(shownPercent)}%</span>
         </div>
         <div>
@@ -418,7 +434,11 @@ function QuizResults({ results, round, correctCount, wrongCount, bestStreak, onR
         {results.map(({ question, result }, n) => {
           const blank = quizType(question) === 'blank';
           return (
-            <li key={question.id} className={`review-item ${result?.correct ? 'is-correct' : 'is-wrong'}`} style={{ '--i': n }}>
+            <li
+              key={question.id}
+              className={`review-item ${result?.correct ? 'is-correct' : 'is-wrong'}`}
+              style={{ '--i': n }}
+            >
               <p className="review-item__question">{question.question}</p>
               {result && !result.correct && (
                 <p className="review-item__line">

@@ -1,5 +1,11 @@
 import { describe, expect, test } from 'vitest';
-import { FileTextError, MAX_FILE_BYTES, cleanExtractedText, extractTextFromFile, fileKind } from '../src/lib/extractText.js';
+import {
+  FileTextError,
+  MAX_FILE_BYTES,
+  cleanExtractedText,
+  extractTextFromFile,
+  fileKind,
+} from '../src/lib/extractText.js';
 
 const file = (content, name, type = '') => new File([content], name, { type });
 
@@ -18,7 +24,7 @@ describe('fileKind', () => {
 
 describe('cleanExtractedText', () => {
   test('normalises newlines, spaces and blank lines', () => {
-    expect(cleanExtractedText('  a\r\nb  c\t\td\n\n\n\n e  ')).toBe('a\nb c d\n\ne');
+    expect(cleanExtractedText('  a\r\nb\u00A0\u00A0c\t\td\n\n\n\n e  ')).toBe('a\nb c d\n\ne');
   });
 
   test('rejoins words a PDF hyphenated across a line break', () => {
@@ -42,7 +48,10 @@ describe('extractTextFromFile', () => {
   test('uses the PDF and Word parsers for those files', async () => {
     const parsers = { pdf: async () => 'from pdf', docx: async () => 'from  docx' };
     await expect(extractTextFromFile(file('x', 'a.pdf'), parsers)).resolves.toEqual({ text: 'from pdf', kind: 'pdf' });
-    await expect(extractTextFromFile(file('x', 'a.docx'), parsers)).resolves.toEqual({ text: 'from docx', kind: 'docx' });
+    await expect(extractTextFromFile(file('x', 'a.docx'), parsers)).resolves.toEqual({
+      text: 'from docx',
+      kind: 'docx',
+    });
   });
 
   test('rejects unsupported types with a helpful message', async () => {

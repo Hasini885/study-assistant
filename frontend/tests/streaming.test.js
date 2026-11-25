@@ -40,7 +40,12 @@ describe('createStudySet streaming', () => {
   test('reports partials as they arrive and resolves with the final set', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => sse([['partial', { studySet: partial }], ['done', { studySet, meta: { attempts: 1 } }]]))
+      vi.fn(async () =>
+        sse([
+          ['partial', { studySet: partial }],
+          ['done', { studySet, meta: { attempts: 1 } }],
+        ])
+      )
     );
     const seen = [];
     const result = await createStudySet({ input: 'Cells' }, undefined, { onPartial: (s) => seen.push(s) });
@@ -69,7 +74,13 @@ describe('createStudySet streaming', () => {
       'fetch',
       vi.fn(async (url, init) =>
         init.headers.Accept === 'text/event-stream'
-          ? sse([['partial', { studySet: partial }], ['done', { studySet }]], { breakAfter: 2 })
+          ? sse(
+              [
+                ['partial', { studySet: partial }],
+                ['done', { studySet }],
+              ],
+              { breakAfter: 2 }
+            )
           : json({ studySet, meta: {} })
       )
     );
@@ -105,7 +116,12 @@ describe('createStudySet streaming', () => {
   test('an invalid partial is skipped rather than shown', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => sse([['partial', { studySet: { flashcards: 'nope' } }], ['done', { studySet }]]))
+      vi.fn(async () =>
+        sse([
+          ['partial', { studySet: { flashcards: 'nope' } }],
+          ['done', { studySet }],
+        ])
+      )
     );
     const onPartial = vi.fn();
     await createStudySet({ input: 'Cells' }, undefined, { onPartial });
@@ -125,7 +141,12 @@ describe('streamed partials in the reducer', () => {
   });
 
   test('a partial from a superseded request is ignored', () => {
-    const state = studySetReducer(start(initialStudySetState), { type: 'partial', studySet: partial, seq: 1, currentSeq: 2 });
+    const state = studySetReducer(start(initialStudySetState), {
+      type: 'partial',
+      studySet: partial,
+      seq: 1,
+      currentSeq: 2,
+    });
     expect(state.partial).toBeNull();
   });
 

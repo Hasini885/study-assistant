@@ -89,7 +89,7 @@ export async function extractTextFromFile(file, parsers = {}) {
 export function cleanExtractedText(text) {
   return String(text ?? '')
     .replace(/\r\n?/g, '\n')
-    .replace(/ /g, ' ')
+    .replace(/\u00A0/g, ' ')
     .replace(/([a-z])-\n([a-z])/g, '$1$2')
     .replace(/[ \t\f\v]+/g, ' ')
     .replace(/ *\n */g, '\n')

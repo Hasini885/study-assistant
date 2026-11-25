@@ -33,7 +33,9 @@ export async function encodeShareFragment(studySet) {
 }
 
 export function isShareFragment(hash) {
-  return String(hash ?? '').replace(/^#/, '').startsWith(PREFIX);
+  return String(hash ?? '')
+    .replace(/^#/, '')
+    .startsWith(PREFIX);
 }
 
 /**

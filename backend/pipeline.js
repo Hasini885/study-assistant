@@ -174,9 +174,13 @@ export function buildExplainRequest(body) {
     throw new UpstreamError('bad_request', 'Answer the question first.', { status: 400 });
   }
   if (chosen.length > LIMITS.option) {
-    throw new UpstreamError('bad_request', `That answer is too long to explain (the limit is ${LIMITS.option} characters).`, {
-      status: 400,
-    });
+    throw new UpstreamError(
+      'bad_request',
+      `That answer is too long to explain (the limit is ${LIMITS.option} characters).`,
+      {
+        status: 400,
+      }
+    );
   }
 
   return {
@@ -186,7 +190,9 @@ export function buildExplainRequest(body) {
 
 /** @returns {Promise<{explanation: string, meta: {model: string}}>} */
 export async function generateExplanation({ messages, signal }) {
-  const completion = await withModelFallback((model) => callGroq({ messages, signal, model, temperature: 0.2, maxTokens: 600 }));
+  const completion = await withModelFallback((model) =>
+    callGroq({ messages, signal, model, temperature: 0.2, maxTokens: 600 })
+  );
   const extracted = extractJson(completion.content);
   const raw = extracted.ok ? (extracted.value?.explanation ?? extracted.value?.text) : null;
   const explanation = typeof raw === 'string' ? raw.replace(/\s+/g, ' ').trim().slice(0, MAX_EXPLANATION_CHARS) : '';
@@ -203,7 +209,13 @@ export async function generateExplanation({ messages, signal }) {
 }
 
 /** Rate limit, validate, explain. Explanations have their own rate-limit bucket. */
-export async function handleExplainRequest({ body, ip, signal, limiter = defaultLimiter(), generate = generateExplanation }) {
+export async function handleExplainRequest({
+  body,
+  ip,
+  signal,
+  limiter = defaultLimiter(),
+  generate = generateExplanation,
+}) {
   await enforceRateLimit(ip, limiter, 'explain');
   return generate({ ...buildExplainRequest(body), signal });
 }
@@ -240,7 +252,9 @@ export async function generateStudySet({ messages, topic, previous, notes, signa
     // user has already waited through; it should just arrive whole.
     const completion =
       onPartial && attempt === 1
-        ? await withModelFallback((model) => streamAttempt({ messages: attemptMessages, signal, topic, onPartial, model }))
+        ? await withModelFallback((model) =>
+            streamAttempt({ messages: attemptMessages, signal, topic, onPartial, model })
+          )
         : await withModelFallback((model) => callGroq({ messages: attemptMessages, signal, model }));
     if (completion.fallback) fallback = completion.fallback;
     const truncated = completion.finishReason === 'length';

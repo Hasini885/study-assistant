@@ -112,7 +112,11 @@ function normalizeFlashcards(list, repairs) {
     }
 
     // Some models return ["term - definition"] or [["term","definition"]].
-    const card = coerceToPair(item, ['front', 'question', 'term', 'q', 'prompt', 'name'], ['back', 'answer', 'definition', 'a', 'response', 'value']);
+    const card = coerceToPair(
+      item,
+      ['front', 'question', 'term', 'q', 'prompt', 'name'],
+      ['back', 'answer', 'definition', 'a', 'response', 'value']
+    );
 
     if (!card) {
       dropped++;
@@ -310,7 +314,14 @@ function normalizeBlank(item, question) {
   if (!answer) return null;
 
   const accepted = [];
-  for (const alt of pickArray(item, ['acceptedAnswers', 'accepted_answers', 'accepted', 'alternatives', 'answers', 'synonyms'])) {
+  for (const alt of pickArray(item, [
+    'acceptedAnswers',
+    'accepted_answers',
+    'accepted',
+    'alternatives',
+    'answers',
+    'synonyms',
+  ])) {
     const text = cleanString(alt, LIMITS.option);
     if (!text || accepted.length >= LIMITS.maxAccepted) continue;
     if ([answer, ...accepted].some((a) => a.toLowerCase() === text.toLowerCase())) continue;
@@ -334,8 +345,15 @@ function resolveAnswerIndex(item, options, correctFromObject) {
   if (correctFromObject >= 0) return correctFromObject;
 
   const raw = pick(item, [
-    'answerIndex', 'answer_index', 'correctIndex', 'correct_index',
-    'answer', 'correctAnswer', 'correct_answer', 'correct', 'solution',
+    'answerIndex',
+    'answer_index',
+    'correctIndex',
+    'correct_index',
+    'answer',
+    'correctAnswer',
+    'correct_answer',
+    'correct',
+    'solution',
   ]);
 
   if (typeof raw === 'number' && Number.isFinite(raw)) {
@@ -413,8 +431,9 @@ function unwrap(raw, repairs) {
       return { flashcards: node };
     }
     if (!isPlainObject(node)) return node;
-    const wrapperKey = ['data', 'result', 'response', 'studySet', 'study_set', 'output', 'json']
-      .find((k) => isPlainObject(node[k]) && !('flashcards' in node) && !('quiz' in node));
+    const wrapperKey = ['data', 'result', 'response', 'studySet', 'study_set', 'output', 'json'].find(
+      (k) => isPlainObject(node[k]) && !('flashcards' in node) && !('quiz' in node)
+    );
     if (!wrapperKey) return node;
     node = node[wrapperKey];
     repairs.push(`Unwrapped a "${wrapperKey}" envelope.`);
@@ -446,8 +465,21 @@ function pickArray(obj, keys) {
 }
 
 const RESERVED_CARD_KEYS = new Set([
-  'front', 'back', 'question', 'answer', 'term', 'definition',
-  'q', 'a', 'prompt', 'response', 'name', 'value', 'hint', 'clue', 'tip',
+  'front',
+  'back',
+  'question',
+  'answer',
+  'term',
+  'definition',
+  'q',
+  'a',
+  'prompt',
+  'response',
+  'name',
+  'value',
+  'hint',
+  'clue',
+  'tip',
 ]);
 
 /**

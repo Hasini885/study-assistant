@@ -13,13 +13,41 @@ const set = {
   title: 'Cell biology: the basics',
   summary: 'Cells.',
   flashcards: [
-    { id: 'c-1', front: 'What is ATP?', back: 'The "energy" currency\nof the cell.', hint: 'Not DNA', source: 'ATP is…', grounded: true },
+    {
+      id: 'c-1',
+      front: 'What is ATP?',
+      back: 'The "energy" currency\nof the cell.',
+      hint: 'Not DNA',
+      source: 'ATP is…',
+      grounded: true,
+    },
     { id: 'c-2', front: '=1+1', back: 'Two, <b>not</b> a formula', hint: '' },
   ],
   quiz: [
-    { id: 'q-1', type: 'mcq', question: 'Where is the Calvin cycle?', options: ['Stroma', 'Thylakoid'], answerIndex: 0, explanation: 'In the stroma.' },
-    { id: 'q-2', type: 'truefalse', question: 'Leaves reflect green.', options: ['True', 'False'], answerIndex: 0, explanation: '' },
-    { id: 'q-3', type: 'blank', question: 'ATP is adenosine _____.', answer: 'triphosphate', accepted: ['tri-phosphate'], explanation: '' },
+    {
+      id: 'q-1',
+      type: 'mcq',
+      question: 'Where is the Calvin cycle?',
+      options: ['Stroma', 'Thylakoid'],
+      answerIndex: 0,
+      explanation: 'In the stroma.',
+    },
+    {
+      id: 'q-2',
+      type: 'truefalse',
+      question: 'Leaves reflect green.',
+      options: ['True', 'False'],
+      answerIndex: 0,
+      explanation: '',
+    },
+    {
+      id: 'q-3',
+      type: 'blank',
+      question: 'ATP is adenosine _____.',
+      answer: 'triphosphate',
+      accepted: ['tri-phosphate'],
+      explanation: '',
+    },
   ],
 };
 
@@ -57,7 +85,7 @@ describe('CSV export', () => {
   const text = toCsv(set);
 
   test('has a BOM, a header and CRLF rows', () => {
-    expect(text.startsWith('﻿kind,front,back,options,explanation,source\r\n')).toBe(true);
+    expect(text.startsWith('\uFEFFkind,front,back,options,explanation,source\r\n')).toBe(true);
     expect(text.trimEnd().split('\r\n')).toHaveLength(1 + 5);
   });
 
@@ -111,7 +139,13 @@ describe('share links', () => {
   });
 
   test('strip a grounded flag smuggled into a hand-made link', async () => {
-    const payload = { v: 1, title: 't', summary: '', flashcards: [{ id: 'c', front: 'f', back: 'b', grounded: true }], quiz: [] };
+    const payload = {
+      v: 1,
+      title: 't',
+      summary: '',
+      flashcards: [{ id: 'c', front: 'f', back: 'b', grounded: true }],
+      quiz: [],
+    };
     const fragment = `set=j.${toBase64Url(new TextEncoder().encode(JSON.stringify(payload)))}`;
     const { studySet } = await decodeShareFragment(fragment);
     expect('grounded' in studySet.flashcards[0]).toBe(false);
@@ -127,7 +161,15 @@ describe('share links', () => {
       ['#set=x.abcd', /newer version/],
       [json({ v: 1, title: 't', flashcards: 'nope', quiz: [] }), /usable study set/],
       [json({ v: 2, title: 't', flashcards: [], quiz: [] }), /usable study set/],
-      [json({ v: 1, title: 't', flashcards: Array.from({ length: 41 }, (_, i) => ({ id: `c${i}`, front: `${i}`, back: 'b' })), quiz: [] }), /usable study set/],
+      [
+        json({
+          v: 1,
+          title: 't',
+          flashcards: Array.from({ length: 41 }, (_, i) => ({ id: `c${i}`, front: `${i}`, back: 'b' })),
+          quiz: [],
+        }),
+        /usable study set/,
+      ],
       [`#set=j.${'A'.repeat(MAX_FRAGMENT_CHARS)}`, /too long/],
     ];
     for (const [hash, reason] of cases) {

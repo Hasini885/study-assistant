@@ -1,7 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { carryGrounding, looksLikeNotes, normalizeForQuote, quoteAppearsIn, verifyGrounding } from '../shared/grounding.js';
+import {
+  carryGrounding,
+  looksLikeNotes,
+  normalizeForQuote,
+  quoteAppearsIn,
+  verifyGrounding,
+} from '../shared/grounding.js';
 import { buildGenerateMessages } from '../prompt.js';
 
 const NOTES = `Photosynthesis happens in two stages.

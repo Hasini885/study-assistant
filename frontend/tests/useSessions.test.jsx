@@ -6,7 +6,16 @@ import { studySet } from './fixtures/studySet.js';
 
 afterEach(() => vi.restoreAllMocks());
 
-const entry = (id, overrides = {}) => ({ id, title: 'Cells', savedAt: 1, counts: {}, studySet, meta: null, progress: {}, ...overrides });
+const entry = (id, overrides = {}) => ({
+  id,
+  title: 'Cells',
+  savedAt: 1,
+  counts: {},
+  studySet,
+  meta: null,
+  progress: {},
+  ...overrides,
+});
 
 describe('useSessions with untrusted storage', () => {
   test('starts empty when storage holds corrupt JSON', () => {
@@ -18,7 +27,12 @@ describe('useSessions with untrusted storage', () => {
   test('keeps the valid sessions and drops the rest', () => {
     window.localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify([entry('good'), { id: 'bad', studySet: { quiz: 'no' } }, 42, entry('also-good', { progress: 'junk' })])
+      JSON.stringify([
+        entry('good'),
+        { id: 'bad', studySet: { quiz: 'no' } },
+        42,
+        entry('also-good', { progress: 'junk' }),
+      ])
     );
     const { result } = renderHook(() => useSessions());
     expect(result.current.sessions.map((s) => s.id)).toEqual(['good', 'also-good']);

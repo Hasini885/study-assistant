@@ -49,9 +49,16 @@ export function StudySetView({
       hashString(
         studySet.quiz
           .map((q) =>
-            [q.id, q.type, q.question, ...(q.options ?? []), q.answerIndex, q.answer, ...(q.accepted ?? []), q.explanation].join(
-              '\u0000'
-            )
+            [
+              q.id,
+              q.type,
+              q.question,
+              ...(q.options ?? []),
+              q.answerIndex,
+              q.answer,
+              ...(q.accepted ?? []),
+              q.explanation,
+            ].join('\u0000')
           )
           .join('\u0001')
       ),

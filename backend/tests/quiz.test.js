@@ -139,22 +139,39 @@ test('a blank with no answer is dropped', () => {
 });
 
 test('accepted answers are capped', () => {
-  const { data } = quizOf([{ type: 'blank', question: '___', answer: 'a', accepted: ['b', 'c', 'd', 'e', 'f', 'g', 'h'] }]);
+  const { data } = quizOf([
+    { type: 'blank', question: '___', answer: 'a', accepted: ['b', 'c', 'd', 'e', 'f', 'g', 'h'] },
+  ]);
   assert.equal(data.quiz[0].accepted.length, 5);
 });
 
 test('isValidStudySet accepts every type, and sets saved before types existed', () => {
   const base = { flashcards: [] };
   assert.equal(isValidStudySet({ ...base, quiz: [{ question: 'q', options: ['a', 'b'], answerIndex: 0 }] }), true);
-  assert.equal(isValidStudySet({ ...base, quiz: [{ type: 'truefalse', question: 'q', options: ['True', 'False'], answerIndex: 1 }] }), true);
-  assert.equal(isValidStudySet({ ...base, quiz: [{ type: 'blank', question: 'q ___', answer: 'a', accepted: [] }] }), true);
+  assert.equal(
+    isValidStudySet({
+      ...base,
+      quiz: [{ type: 'truefalse', question: 'q', options: ['True', 'False'], answerIndex: 1 }],
+    }),
+    true
+  );
+  assert.equal(
+    isValidStudySet({ ...base, quiz: [{ type: 'blank', question: 'q ___', answer: 'a', accepted: [] }] }),
+    true
+  );
 });
 
 test('isValidStudySet rejects malformed blanks and unknown types', () => {
   const base = { flashcards: [] };
   assert.equal(isValidStudySet({ ...base, quiz: [{ type: 'blank', question: 'q', answer: '' }] }), false);
-  assert.equal(isValidStudySet({ ...base, quiz: [{ type: 'blank', question: 'q', answer: 'a', accepted: [1] }] }), false);
-  assert.equal(isValidStudySet({ ...base, quiz: [{ type: 'essay', question: 'q', options: ['a', 'b'], answerIndex: 0 }] }), false);
+  assert.equal(
+    isValidStudySet({ ...base, quiz: [{ type: 'blank', question: 'q', answer: 'a', accepted: [1] }] }),
+    false
+  );
+  assert.equal(
+    isValidStudySet({ ...base, quiz: [{ type: 'essay', question: 'q', options: ['a', 'b'], answerIndex: 0 }] }),
+    false
+  );
 });
 
 test('studySetLimitViolation checks blank answers', () => {

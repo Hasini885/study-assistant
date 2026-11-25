@@ -93,7 +93,8 @@ test('converts NaN and undefined to null', () => {
 });
 
 test('recovers a truncated response by closing what is open', () => {
-  const truncated = '{"title":"Bio","flashcards":[{"front":"What is ATP?","back":"Energy currency"},{"front":"What is DN';
+  const truncated =
+    '{"title":"Bio","flashcards":[{"front":"What is ATP?","back":"Energy currency"},{"front":"What is DN';
   const result = extractJson(truncated);
 
   assert.equal(result.ok, true);

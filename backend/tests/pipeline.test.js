@@ -2,14 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  buildExplainRequest,
   buildGenerateRequest,
   buildRefineRequest,
   enforceRateLimit,
   errorResponse,
+  generateExplanation,
   generateStudySet,
+  handleExplainRequest,
   handleStudySetRequest,
   UpstreamError,
 } from '../pipeline.js';
+import { primaryModel } from '../groq.js';
 
 const question = { question: 'Where?', options: ['Stroma', 'Thylakoid'], answerIndex: 0, explanation: '' };
 
@@ -229,10 +233,7 @@ test('refining sends ids to the model and keeps them on the result', async (t) =
   );
   assert.match(calls[0].messages[1].content, /Copy it unchanged/);
 
-  assert.deepEqual(
-    studySet.flashcards.map((c) => c.id).slice(0, 2),
-    ['card-0-1', 'card-1-2']
-  );
+  assert.deepEqual(studySet.flashcards.map((c) => c.id).slice(0, 2), ['card-0-1', 'card-1-2']);
   assert.ok(!['card-0-1', 'card-1-2'].includes(studySet.flashcards[2].id));
   assert.equal(studySet.quiz[0].id, 'q-0-3');
 });
@@ -250,7 +251,11 @@ test('notes get source quotes that are checked against the notes', async (t) => 
     JSON.stringify({
       title: 'Photosynthesis',
       flashcards: [
-        { front: 'Where is the Calvin cycle?', back: 'The stroma', source: 'The Calvin cycle takes place in the stroma' },
+        {
+          front: 'Where is the Calvin cycle?',
+          back: 'The stroma',
+          source: 'The Calvin cycle takes place in the stroma',
+        },
         { front: 'What absorbs light?', back: 'Chlorophyll', source: 'Chlorophyll absorbs red and blue light' },
       ],
       quiz: [{ ...question, source: 'produce ATP and NADPH' }],
@@ -278,8 +283,6 @@ test('a bare topic is not asked for sources and is not graded on them', async (t
 
 /* ---------------------------------- model --------------------------------- */
 
-import { primaryModel } from '../groq.js';
-
 test('the default model is one Groq still serves', () => {
   // Regression: the default was llama-3.3-70b-versatile, which Groq retired,
   // so every request without a GROQ_MODEL override failed.
@@ -293,8 +296,6 @@ test('the default model is one Groq still serves', () => {
 });
 
 /* ---------------------------------- explain -------------------------------- */
-
-import { buildExplainRequest, generateExplanation, handleExplainRequest } from '../pipeline.js';
 
 const explainSet = () =>
   studySet({
@@ -324,7 +325,14 @@ test('buildExplainRequest rejects unknown questions, missing or oversized answer
     [{ studySet: explainSet(), questionId: 'q-1', chosen: '  ' }, /Answer the question first/],
     [{ studySet: explainSet(), questionId: 'q-1', chosen: 'x'.repeat(301) }, /too long/],
     [{ studySet: { nope: 1 }, questionId: 'q-1', chosen: 'x' }, /can no longer be explained/],
-    [{ studySet: studySet({ flashcards: Array.from({ length: 41 }, (_, i) => ({ front: `${i}`, back: 'b' })) }), questionId: 'q1', chosen: 'x' }, /41 flashcards/],
+    [
+      {
+        studySet: studySet({ flashcards: Array.from({ length: 41 }, (_, i) => ({ front: `${i}`, back: 'b' })) }),
+        questionId: 'q1',
+        chosen: 'x',
+      },
+      /41 flashcards/,
+    ],
   ];
   for (const [body, pattern] of cases) {
     const error = badRequest(() => buildExplainRequest(body));
@@ -342,7 +350,10 @@ test('generateExplanation returns the model explanation, trimmed and capped', as
 
 test('generateExplanation fails clearly when the model returns nothing usable', async (t) => {
   mockGroq(t, JSON.stringify({ nope: true }));
-  await assert.rejects(generateExplanation({ messages: [] }), (error) => error.code === 'unusable_output' && error.retryable);
+  await assert.rejects(
+    generateExplanation({ messages: [] }),
+    (error) => error.code === 'unusable_output' && error.retryable
+  );
 });
 
 test('explanations are rate limited in their own bucket', async () => {

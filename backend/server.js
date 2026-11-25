@@ -86,7 +86,8 @@ if (process.env.NODE_ENV === 'production') {
   app.get('*', (req, res) => res.sendFile(path.join(dist, 'index.html')));
 }
 
-app.use((error, req, res, next) => sendError(res, error));
+// Four parameters is how Express recognises error-handling middleware.
+app.use((error, req, res, _next) => sendError(res, error));
 
 function sendError(res, error) {
   const { status, headers, body } = errorResponse(error);

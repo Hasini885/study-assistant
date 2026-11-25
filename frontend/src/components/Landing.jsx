@@ -44,17 +44,14 @@ export function Landing({ onEnter, recentSession, onResume, dueCount = 0, onRevi
   }, [leaving]);
 
   /** Play the exit, then hand over. Skipped entirely under reduced motion. */
-  const leave = useCallback(
-    (action) => {
-      if (prefersReducedMotion()) {
-        action();
-        return;
-      }
-      setLeaving(true);
-      setTimeout(action, EXIT_MS);
-    },
-    []
-  );
+  const leave = useCallback((action) => {
+    if (prefersReducedMotion()) {
+      action();
+      return;
+    }
+    setLeaving(true);
+    setTimeout(action, EXIT_MS);
+  }, []);
 
   const start = useCallback(() => leave(onEnter), [leave, onEnter]);
 
@@ -72,10 +69,7 @@ export function Landing({ onEnter, recentSession, onResume, dueCount = 0, onRevi
   }, [start]);
 
   return (
-    <main
-      className={`landing ${leaving ? 'is-leaving' : ''}`}
-      style={{ '--px': parallax.x, '--py': parallax.y }}
-    >
+    <main className={`landing ${leaving ? 'is-leaving' : ''}`} style={{ '--px': parallax.x, '--py': parallax.y }}>
       {/* Two parallax planes: the cards drift one way, the wordmark the other. */}
       <div className="landing__deck" aria-hidden="true">
         <span className="landing__card landing__card--1" />
@@ -92,13 +86,11 @@ export function Landing({ onEnter, recentSession, onResume, dueCount = 0, onRevi
         </h1>
 
         <p className="landing__lede">
-          Paste your notes on{' '}
-          {/* Keyed so the swap replays the animation each time. */}
+          Paste your notes on {/* Keyed so the swap replays the animation each time. */}
           <span className="landing__topic" key={topic}>
             {TOPICS[topic]}
           </span>
-          . Get flashcards you can flip through and a quiz that keeps re-testing whatever you got
-          wrong.
+          . Get flashcards you can flip through and a quiz that keeps re-testing whatever you got wrong.
         </p>
 
         <div className="landing__actions">

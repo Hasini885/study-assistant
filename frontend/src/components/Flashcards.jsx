@@ -118,11 +118,7 @@ export function Flashcards({ cards, statuses, records = {}, onMark, onGrade, ind
         </span>
         <div className="deck__tools">
           <label className="toggle">
-            <input
-              type="checkbox"
-              checked={reviewOnly}
-              onChange={(event) => setReviewOnly(event.target.checked)}
-            />
+            <input type="checkbox" checked={reviewOnly} onChange={(event) => setReviewOnly(event.target.checked)} />
             Flagged only
           </label>
           <button
@@ -203,7 +199,13 @@ export function Flashcards({ cards, statuses, records = {}, onMark, onGrade, ind
           </p>
 
           <div className="deck__controls">
-            <button type="button" className="btn btn--icon" onClick={() => go(-1)} disabled={position === 0} aria-label="Previous card">
+            <button
+              type="button"
+              className="btn btn--icon"
+              onClick={() => go(-1)}
+              disabled={position === 0}
+              aria-label="Previous card"
+            >
               ←
             </button>
             <button type="button" className="btn btn--wide" onClick={() => setFlipped((v) => !v)}>
@@ -220,12 +222,14 @@ export function Flashcards({ cards, statuses, records = {}, onMark, onGrade, ind
             </button>
           </div>
 
-          {flipped && onGrade && (
-            <GradeBar srs={records[card.id]?.srs} onGrade={gradeCard} />
-          )}
+          {flipped && onGrade && <GradeBar srs={records[card.id]?.srs} onGrade={gradeCard} />}
 
           <div className="deck__marks">
-            <button type="button" className={`btn btn--mark ${status === 'known' ? 'is-active' : ''}`} onClick={() => mark('known')}>
+            <button
+              type="button"
+              className={`btn btn--mark ${status === 'known' ? 'is-active' : ''}`}
+              onClick={() => mark('known')}
+            >
               Got it <kbd>1</kbd>
             </button>
             <button

@@ -90,7 +90,13 @@ test('an id the model explicitly kept is trusted even if the text was rewritten'
 });
 
 test('new items keep a unique id of their own', () => {
-  const next = { flashcards: [{ id: 'c-fresh', front: 'New', back: 'Card' }, { front: 'Another', back: 'One' }], quiz: [] };
+  const next = {
+    flashcards: [
+      { id: 'c-fresh', front: 'New', back: 'Card' },
+      { front: 'Another', back: 'One' },
+    ],
+    quiz: [],
+  };
   const { studySet, matched } = reconcileIds(previous, next);
   assert.equal(studySet.flashcards[0].id, 'c-fresh');
   assert.equal(studySet.flashcards[1].id, contentId('c', 'Another'));

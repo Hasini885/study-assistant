@@ -11,7 +11,7 @@ test('rate limiting is disabled when the Upstash env vars are absent', () => {
   assert.equal(rateLimitConfig({}).enabled, false);
   assert.equal(rateLimitConfig({ UPSTASH_REDIS_REST_URL: 'https://x' }).enabled, false);
   assert.equal(rateLimitConfig({ UPSTASH_REDIS_REST_TOKEN: 't' }).enabled, false);
-  assert.equal(rateLimitConfig({ UPSTASH_REDIS_REST_URL: '  ', UPSTASH_REDIS_REST_TOKEN: '﻿' }).enabled, false);
+  assert.equal(rateLimitConfig({ UPSTASH_REDIS_REST_URL: '  ', UPSTASH_REDIS_REST_TOKEN: '\uFEFF' }).enabled, false);
 });
 
 test('rate limiting is enabled with either naming of the Upstash env vars', () => {
@@ -20,7 +20,10 @@ test('rate limiting is enabled with either naming of the Upstash env vars', () =
 });
 
 test('config strips BOMs, quotes and whitespace from the env values', () => {
-  const config = rateLimitConfig({ UPSTASH_REDIS_REST_URL: '﻿"https://x" ', UPSTASH_REDIS_REST_TOKEN: " 'tok'\n" });
+  const config = rateLimitConfig({
+    UPSTASH_REDIS_REST_URL: '\uFEFF"https://x" ',
+    UPSTASH_REDIS_REST_TOKEN: " 'tok'\n",
+  });
   assert.equal(config.url, 'https://x');
   assert.equal(config.token, 'tok');
 });

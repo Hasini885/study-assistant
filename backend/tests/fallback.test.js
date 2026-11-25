@@ -97,7 +97,9 @@ test('a rate-limited primary is reported in meta when the backup generates the s
       return new Response(JSON.stringify({ error: { message: 'Rate limit' } }), { status: 429 });
     }
     const content = JSON.stringify({ title: 'Bio', flashcards: [{ front: 'a?', back: 'b' }], quiz: [] });
-    return new Response(JSON.stringify({ choices: [{ message: { content }, finish_reason: 'stop' }] }), { status: 200 });
+    return new Response(JSON.stringify({ choices: [{ message: { content }, finish_reason: 'stop' }] }), {
+      status: 200,
+    });
   });
 
   const { meta } = await generateStudySet(buildGenerateRequest({ input: 'Cells' }));

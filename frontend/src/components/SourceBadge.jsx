@@ -23,7 +23,10 @@ export function SourceBadge({ item, showQuote = true }) {
   }
   if (item?.grounded === false) {
     return (
-      <span className="source source--warn" title="The model's supporting quote couldn't be found in your notes. Worth checking.">
+      <span
+        className="source source--warn"
+        title="The model's supporting quote couldn't be found in your notes. Worth checking."
+      >
         <span className="source__badge">
           <span aria-hidden="true">? </span>Not found in your notes
         </span>

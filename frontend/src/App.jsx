@@ -215,7 +215,10 @@ export default function App() {
 
   const handleDueGrade = useCallback(
     (sessionId, cardId, grade) =>
-      updateProgress(sessionId, (current) => ({ ...current, [cardId]: gradeRecord(current[cardId], grade, Date.now()) })),
+      updateProgress(sessionId, (current) => ({
+        ...current,
+        [cardId]: gradeRecord(current[cardId], grade, Date.now()),
+      })),
     [updateProgress]
   );
 
@@ -298,7 +301,12 @@ export default function App() {
             <ProgressPanel counts={progress.counts} quizStats={quizStats} onResetProgress={progress.reset} />
           )}
 
-          <DuePanel count={dueItems.length} hasSchedule={hasSchedule} reviewing={view === 'due'} onStart={startDueReview} />
+          <DuePanel
+            count={dueItems.length}
+            hasSchedule={hasSchedule}
+            reviewing={view === 'due'}
+            onStart={startDueReview}
+          />
 
           <SessionList
             sessions={sessions}
@@ -322,8 +330,8 @@ export default function App() {
               <div className="banner__body">
                 <strong>No API key configured</strong>
                 <span>
-                  Copy <code>.env.example</code> to <code>.env</code>, add <code>GROQ_API_KEY</code>, and restart
-                  the server.
+                  Copy <code>.env.example</code> to <code>.env</code>, add <code>GROQ_API_KEY</code>, and restart the
+                  server.
                 </span>
               </div>
             </div>
@@ -365,8 +373,8 @@ export default function App() {
                     <div>
                       <h2 className="hero__title">What are you studying?</h2>
                       <p className="hero__lede">
-                        Paste a page of notes or name a topic. You'll get flashcards to flip through and a quiz
-                        that re-tests whatever you get wrong.
+                        Paste a page of notes or name a topic. You’ll get flashcards to flip through and a quiz that
+                        re-tests whatever you get wrong.
                       </p>
                     </div>
                     <HeroArt />

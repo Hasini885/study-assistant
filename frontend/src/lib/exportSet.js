@@ -23,7 +23,8 @@ export function toAnkiTsv(studySet) {
     ]),
     ...studySet.quiz.map((q) => {
       const type = quizType(q);
-      const options = type === 'blank' ? '' : `<ol type="A">${q.options.map((o) => `<li>${html(o)}</li>`).join('')}</ol>`;
+      const options =
+        type === 'blank' ? '' : `<ol type="A">${q.options.map((o) => `<li>${html(o)}</li>`).join('')}</ol>`;
       const back = html(correctAnswerText(q)) + (q.explanation ? `<br><br>${html(q.explanation)}` : '');
       return [html(q.question) + options, back, `${tag} quiz`];
     }),
@@ -49,7 +50,7 @@ export function toCsv(studySet) {
       q.source ?? '',
     ]),
   ];
-  return `﻿${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}\r\n`;
+  return `\uFEFF${rows.map((row) => row.map(csvCell).join(',')).join('\r\n')}\r\n`;
 }
 
 /**

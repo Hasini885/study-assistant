@@ -131,7 +131,10 @@ export function PromptForm({ onSubmit, busy, compact = false }) {
         </span>
       </div>
 
-      <p id={compact ? 'prompt-help-compact' : 'prompt-help'} className={`prompt-form__help ${tooLong ? 'is-over' : ''}`}>
+      <p
+        id={compact ? 'prompt-help-compact' : 'prompt-help'}
+        className={`prompt-form__help ${tooLong ? 'is-over' : ''}`}
+      >
         {tooLong ? (
           <>
             That’s {input.length.toLocaleString()} characters — the limit is {MAX_CHARS.toLocaleString()}. Trim it, or{' '}

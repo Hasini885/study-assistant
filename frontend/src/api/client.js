@@ -158,7 +158,9 @@ export async function explainAnswer({ studySet, questionId, chosen }, signal) {
   }
   if (!response.ok || payload?.error) throw toApiError(payload?.error, response.status);
   if (typeof payload?.explanation !== 'string' || !payload.explanation) {
-    throw new ApiError('bad_payload', 'The server returned an explanation in an unexpected format.', { retryable: true });
+    throw new ApiError('bad_payload', 'The server returned an explanation in an unexpected format.', {
+      retryable: true,
+    });
   }
   return payload.explanation;
 }

@@ -34,7 +34,10 @@ const MIN_FRAGMENT_CHARS = 6;
  * @returns {boolean}
  */
 export function looksLikeNotes(input) {
-  const words = String(input ?? '').trim().split(/\s+/).filter(Boolean);
+  const words = String(input ?? '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
   return words.length >= 40;
 }
 
@@ -49,7 +52,7 @@ export function normalizeForQuote(text) {
   return String(text ?? '')
     .normalize('NFKC')
     .toLowerCase()
-    .replace(/[​-‍﻿]/g, '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
     .replace(/[‘’‚‛′]/g, "'")
     .replace(/[“”„‟″]/g, '"')
     .replace(/[‐‑‒–—―−]/g, '-')

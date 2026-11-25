@@ -12,10 +12,12 @@
  * {
  *   title: string,
  *   summary: string,
- *   flashcards: [{ id, front, back, hint }],
+ *   flashcards: [{ id, front, back, hint }],   ids are stable: see ids.js
  *   quiz: [{ id, question, options: string[], answerIndex: number, explanation }]
  * }
  */
+
+import { claimUniqueId, contentId, isWellFormedId } from './ids.js';
 
 export const LIMITS = {
   title: 120,
@@ -74,6 +76,7 @@ export function normalizeStudySet(raw, { topic = '' } = {}) {
 function normalizeFlashcards(list, repairs) {
   const out = [];
   const seen = new Set();
+  const usedIds = new Set();
   let dropped = 0;
 
   for (const item of list) {
@@ -105,7 +108,7 @@ function normalizeFlashcards(list, repairs) {
     seen.add(key);
 
     out.push({
-      id: makeId('card', out.length),
+      id: itemId(item, 'c', front, usedIds),
       front,
       back,
       hint: cleanString(isPlainObject(item) ? pick(item, ['hint', 'clue', 'tip']) : '', LIMITS.text),
@@ -122,6 +125,7 @@ function normalizeFlashcards(list, repairs) {
 
 function normalizeQuiz(list, repairs) {
   const out = [];
+  const usedIds = new Set();
   let dropped = 0;
 
   for (const item of list) {
@@ -174,7 +178,7 @@ function normalizeQuiz(list, repairs) {
     }
 
     out.push({
-      id: makeId('q', out.length),
+      id: itemId(item, 'q', question, usedIds),
       question,
       options,
       answerIndex,
@@ -345,10 +349,14 @@ function isTruthy(v) {
   return v === true || v === 'true' || v === 1 || v === '1';
 }
 
-let idCounter = 0;
-function makeId(prefix, index) {
-  idCounter += 1;
-  return `${prefix}-${index}-${idCounter.toString(36)}`;
+/**
+ * An id the model sent back (refinement round-trips them), or one derived from
+ * the item's text — so the same card gets the same id every time it's
+ * normalized, which is what lets progress survive a refine. See ids.js.
+ */
+function itemId(item, prefix, text, usedIds) {
+  const given = isPlainObject(item) ? item.id : undefined;
+  return claimUniqueId(isWellFormedId(given) ? given : contentId(prefix, text), usedIds);
 }
 
 /**

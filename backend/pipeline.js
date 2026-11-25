@@ -10,6 +10,7 @@
 import { callGroq, hasApiKey, UpstreamError } from './groq.js';
 import { buildGenerateMessages, buildRefineMessages, buildRepairMessages } from './prompt.js';
 import { createRateLimiter, secondsUntil } from './rateLimit.js';
+import { reconcileIds } from './shared/ids.js';
 import { extractJson } from './shared/extractJson.js';
 import { normalizeStudySet, isValidStudySet, studySetLimitViolation } from './shared/normalize.js';
 
@@ -51,7 +52,7 @@ function defaultLimiter() {
  * @param {object} args
  * @param {unknown} args.body   the parsed request body
  * @param {string}  args.ip     the client's address, for rate limiting
- * @param {(body: unknown) => {messages: Array, topic: string}} args.build
+ * @param {(body: unknown) => {messages: Array, topic: string, previous?: object}} args.build
  * @param {AbortSignal} [args.signal]
  * @param {{check: (id: string) => Promise<{success: boolean, reset?: number}>}} [args.limiter] injectable for tests
  * @param {typeof generateStudySet} [args.generate] injectable for tests
@@ -65,8 +66,8 @@ export async function handleStudySetRequest({
   generate = generateStudySet,
 }) {
   await enforceRateLimit(ip, limiter);
-  const { messages, topic } = build(body);
-  return generate({ messages, topic, signal });
+  const { messages, topic, previous } = build(body);
+  return generate({ messages, topic, previous, signal });
 }
 
 /**
@@ -122,6 +123,9 @@ export function buildRefineRequest(body) {
   return {
     messages: buildRefineMessages({ studySet, instruction: instruction.trim() }),
     topic: studySet.title,
+    // Kept so the refined items can inherit the ids (and so the progress) of
+    // the items they came from.
+    previous: studySet,
   };
 }
 
@@ -134,9 +138,14 @@ export function buildRefineRequest(body) {
  * model its own bad output and ask once more. Two attempts is the sweet spot:
  * a third rarely converges and the user is already waiting.
  *
+ * @param {object} args
+ * @param {Array} args.messages
+ * @param {string} args.topic
+ * @param {object} [args.previous] the set being refined, whose ids carry over
+ * @param {AbortSignal} [args.signal]
  * @returns {Promise<{studySet: object, meta: object}>}
  */
-export async function generateStudySet({ messages, topic, signal }) {
+export async function generateStudySet({ messages, topic, previous, signal }) {
   const startedAt = Date.now();
   let attemptMessages = messages;
   let lastProblem = 'Unknown parsing failure.';
@@ -159,8 +168,10 @@ export async function generateStudySet({ messages, topic, signal }) {
         }
         if (truncated) repairs.push('The response was cut short, so the set may be shorter than requested.');
 
+        const studySet = previous ? reconcileIds(previous, normalized.data).studySet : normalized.data;
+
         return {
-          studySet: normalized.data,
+          studySet,
           meta: {
             repairs: [...repairs, ...normalized.repairs],
             attempts: attempt,

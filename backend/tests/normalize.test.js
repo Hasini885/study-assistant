@@ -284,3 +284,37 @@ test('studySetLimitViolation rejects non-text values that would crash the UI', (
 test('studySetLimitViolation reports an invalid shape', () => {
   assert.equal(studySetLimitViolation({ flashcards: 'nope' }), 'an invalid shape');
 });
+
+/* ---------------------------------- ids ---------------------------------- */
+
+test('ids are derived from content, so normalizing twice gives the same ids', () => {
+  const raw = { flashcards: [goodCard], quiz: [goodQuestion] };
+  const a = normalizeStudySet(raw).data;
+  const b = normalizeStudySet(JSON.parse(JSON.stringify(raw))).data;
+  assert.equal(a.flashcards[0].id, b.flashcards[0].id);
+  assert.equal(a.quiz[0].id, b.quiz[0].id);
+  assert.match(a.flashcards[0].id, /^c-/);
+  assert.match(a.quiz[0].id, /^q-/);
+});
+
+test('a well-formed id sent by the model is kept', () => {
+  const result = normalizeStudySet({ flashcards: [{ ...goodCard, id: 'card-0-7' }], quiz: [{ ...goodQuestion, id: 'q-3' }] });
+  assert.equal(result.data.flashcards[0].id, 'card-0-7');
+  assert.equal(result.data.quiz[0].id, 'q-3');
+});
+
+test('malformed or duplicate ids from the model are replaced', () => {
+  const result = normalizeStudySet({
+    flashcards: [
+      { ...goodCard, id: 'not ok!' },
+      { front: 'Second', back: 'card', id: 'dup' },
+      { front: 'Third', back: 'card', id: 'dup' },
+    ],
+    quiz: [{ ...goodQuestion, id: 42 }, { ...goodQuestion, question: 'Same text?', id: 'dup' }],
+  });
+  const ids = result.data.flashcards.map((c) => c.id);
+  assert.match(ids[0], /^c-/);
+  assert.equal(ids[1], 'dup');
+  assert.equal(ids[2], 'dup-2');
+  assert.match(result.data.quiz[0].id, /^q-/);
+});

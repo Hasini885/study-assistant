@@ -6,6 +6,7 @@ import {
   buildRefineRequest,
   enforceRateLimit,
   errorResponse,
+  generateStudySet,
   handleStudySetRequest,
   UpstreamError,
 } from '../pipeline.js';
@@ -176,4 +177,62 @@ test('errorResponse sends no extra headers for other errors', (t) => {
   t.mock.method(console, 'error', () => {});
   assert.deepEqual(errorResponse(new UpstreamError('bad_request', 'x', { status: 400 })).headers, {});
   assert.deepEqual(errorResponse(new Error('boom')).headers, {});
+});
+
+/* ---------------------------- refine keeps ids ---------------------------- */
+
+function mockGroq(t, content) {
+  process.env.GROQ_API_KEY = process.env.GROQ_API_KEY || 'test-key';
+  const calls = [];
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    calls.push(JSON.parse(init.body));
+    return new Response(JSON.stringify({ choices: [{ message: { content }, finish_reason: 'stop' }] }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+  return calls;
+}
+
+test('refining sends ids to the model and keeps them on the result', async (t) => {
+  const previousSet = {
+    title: 'Bio',
+    summary: '',
+    flashcards: [
+      { id: 'card-0-1', front: 'What is ATP?', back: 'Energy currency.', hint: '' },
+      { id: 'card-1-2', front: 'What is DNA?', back: 'Genetic material.', hint: '' },
+    ],
+    quiz: [{ id: 'q-0-3', ...question }],
+  };
+
+  // The model keeps one id, drops another (but keeps the card), and adds a card.
+  const calls = mockGroq(
+    t,
+    JSON.stringify({
+      title: 'Bio',
+      flashcards: [
+        { id: 'card-0-1', front: 'What is ATP? Explain.', back: 'The energy currency of the cell.' },
+        { front: 'What is DNA?', back: 'Genetic material.' },
+        { front: 'What is RNA?', back: 'A messenger.' },
+      ],
+      quiz: [{ ...question }],
+    })
+  );
+
+  const request = buildRefineRequest({ studySet: previousSet, instruction: 'add a card about RNA' });
+  const { studySet } = await generateStudySet(request);
+
+  const sentSet = JSON.parse(calls[0].messages[1].content.match(/\{[\s\S]*\}/)[0]);
+  assert.deepEqual(
+    sentSet.flashcards.map((c) => c.id),
+    ['card-0-1', 'card-1-2']
+  );
+  assert.match(calls[0].messages[1].content, /Copy it unchanged/);
+
+  assert.deepEqual(
+    studySet.flashcards.map((c) => c.id).slice(0, 2),
+    ['card-0-1', 'card-1-2']
+  );
+  assert.ok(!['card-0-1', 'card-1-2'].includes(studySet.flashcards[2].id));
+  assert.equal(studySet.quiz[0].id, 'q-0-3');
 });

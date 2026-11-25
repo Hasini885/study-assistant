@@ -3,16 +3,16 @@ import { Flashcards } from './Flashcards.jsx';
 import { CardGrid } from './CardGrid.jsx';
 import { Quiz } from './Quiz.jsx';
 import { RepairNotice } from './States.jsx';
+import { hashString } from '@contract/ids.js';
 
 const REFINE_EXAMPLES = ['Make the questions harder', 'Add 3 cards about definitions', 'Simplify the wording'];
 
 /**
  * The workspace: three ways to work through a set, plus the refinement loop.
  *
- * `resetKey` remounts the study components whenever the underlying set
- * changes. Card-level progress belongs to a specific set of cards; carrying a
- * half-finished quiz across a regeneration would show scores for questions
- * that no longer exist.
+ * The deck and the quiz each remount when their own items change (see
+ * cardsKey / quizKey): carrying a half-finished quiz across an edit would show
+ * scores for questions that no longer exist.
  */
 export function StudySetView({
   studySet,
@@ -31,12 +31,29 @@ export function StudySetView({
   const [tab, setTab] = useState(() => (hasCards ? 'cards' : 'quiz'));
   const [deckIndex, setDeckIndex] = useState(0);
 
-  const resetKey = useMemo(() => studySet.flashcards[0]?.id ?? studySet.quiz[0]?.id ?? 'empty', [studySet]);
+  // Ids are stable across a refinement now, so "the first id changed" no longer
+  // means "different content". Each view remounts only when *its* items change:
+  // a refine that only touched the quiz leaves the deck where you were, and
+  // vice versa. Progress lives above this component and is keyed by id, so it
+  // survives either way.
+  const cardsKey = useMemo(
+    () => hashString(studySet.flashcards.map((c) => `${c.id}\u0000${c.front}\u0000${c.back}`).join('\u0001')),
+    [studySet.flashcards]
+  );
+  const quizKey = useMemo(
+    () =>
+      hashString(
+        studySet.quiz
+          .map((q) => [q.id, q.question, ...q.options, q.answerIndex, q.explanation].join('\u0000'))
+          .join('\u0001')
+      ),
+    [studySet.quiz]
+  );
 
-  // A new set starts at the first card.
+  // Changed cards start at the first card.
   useEffect(() => {
     setDeckIndex(0);
-  }, [resetKey]);
+  }, [cardsKey]);
 
   const studyCard = useCallback((index) => {
     setDeckIndex(index);
@@ -91,7 +108,7 @@ export function StudySetView({
 
         {activeTab === 'cards' && hasCards && (
           <Flashcards
-            key={`cards-${resetKey}`}
+            key={`cards-${cardsKey}`}
             cards={studySet.flashcards}
             statuses={progress.statuses}
             onMark={progress.setStatus}
@@ -102,7 +119,7 @@ export function StudySetView({
 
         {activeTab === 'browse' && hasCards && (
           <CardGrid
-            key={`browse-${resetKey}`}
+            key={`browse-${cardsKey}`}
             cards={studySet.flashcards}
             statuses={progress.statuses}
             onMark={progress.setStatus}
@@ -111,7 +128,7 @@ export function StudySetView({
         )}
 
         {activeTab === 'quiz' && hasQuiz && (
-          <Quiz key={`quiz-${resetKey}`} questions={studySet.quiz} onRoundComplete={onQuizRound} />
+          <Quiz key={`quiz-${quizKey}`} questions={studySet.quiz} onRoundComplete={onQuizRound} />
         )}
       </div>
 

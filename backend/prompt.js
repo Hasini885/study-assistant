@@ -61,16 +61,19 @@ export function buildGenerateMessages({ input }) {
 
 /**
  * Refinement: the model edits an existing set rather than regenerating it.
- * We send the current set back so unchanged items survive verbatim, which keeps
- * the user's quiz progress meaningful across a refinement.
+ * We send the current set back, ids included, so unchanged items survive
+ * verbatim and keep their ids — and with them the user's study progress. The
+ * pipeline falls back to content matching (shared/ids.js) when the model
+ * drops or scrambles an id.
  */
 export function buildRefineMessages({ studySet, instruction }) {
   const current = JSON.stringify(
     {
       title: studySet.title,
       summary: studySet.summary,
-      flashcards: studySet.flashcards.map(({ front, back, hint }) => ({ front, back, hint })),
-      quiz: studySet.quiz.map(({ question, options, answerIndex, explanation }) => ({
+      flashcards: studySet.flashcards.map(({ id, front, back, hint }) => ({ id, front, back, hint })),
+      quiz: studySet.quiz.map(({ id, question, options, answerIndex, explanation }) => ({
+        id,
         question,
         options,
         answerIndex,
@@ -85,7 +88,7 @@ export function buildRefineMessages({ studySet, instruction }) {
     { role: 'system', content: SYSTEM_PROMPT },
     {
       role: 'user',
-      content: `Here is an existing study set:\n\n${current}\n\nApply this change: "${instruction}"\n\nReturn the COMPLETE updated study set in the same JSON shape. Keep every item the instruction does not touch exactly as it is. Do not drop items unless asked to.`,
+      content: `Here is an existing study set:\n\n${current}\n\nApply this change: "${instruction}"\n\nReturn the COMPLETE updated study set in the same JSON shape. Keep every item the instruction does not touch exactly as it is. Do not drop items unless asked to.\n\nEvery existing item has an "id". Copy it unchanged onto that item in your output, even if you edit the item's text. Items you add have no "id". Never reuse an id on a different item.`,
     },
   ];
 }

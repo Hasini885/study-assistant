@@ -275,3 +275,19 @@ test('a bare topic is not asked for sources and is not graded on them', async (t
   assert.equal('grounded' in studySet.flashcards[0], false);
   assert.equal(meta.grounding, undefined);
 });
+
+/* ---------------------------------- model --------------------------------- */
+
+import { primaryModel } from '../groq.js';
+
+test('the default model is one Groq still serves', () => {
+  // Regression: the default was llama-3.3-70b-versatile, which Groq retired,
+  // so every request without a GROQ_MODEL override failed.
+  const saved = process.env.GROQ_MODEL;
+  delete process.env.GROQ_MODEL;
+  try {
+    assert.equal(primaryModel(), 'openai/gpt-oss-120b');
+  } finally {
+    if (saved !== undefined) process.env.GROQ_MODEL = saved;
+  }
+});

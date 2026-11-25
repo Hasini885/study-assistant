@@ -8,7 +8,10 @@
  */
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const DEFAULT_MODEL = 'llama-3.3-70b-versatile';
+// llama-3.3-70b-versatile was retired from Groq; requests for it now fail with
+// "model does not exist". gpt-oss-120b returned full, valid, well-grounded
+// sets in testing. Override with GROQ_MODEL.
+const DEFAULT_MODEL = 'openai/gpt-oss-120b';
 
 // Per-call ceiling. A request can make two calls (one generate, one repair), so
 // this must stay comfortably under half the serverless function's maxDuration

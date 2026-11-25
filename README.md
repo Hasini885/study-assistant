@@ -157,7 +157,7 @@ vercel --prod
 ```
 free-form text
   → POST /api/study-set
-      → Groq (llama-3.3-70b-versatile, JSON mode)
+      → Groq (openai/gpt-oss-120b by default, JSON mode)
       → extractJson()        tolerant parse
       → normalizeStudySet()  shape repair + validation
       → retry once on failure, showing the model its own bad output

@@ -152,7 +152,8 @@ describe('Quiz', () => {
     expect(screen.queryByRole('button', { name: 'Explain this' })).not.toBeInTheDocument();
     await user.keyboard('{Enter}');
 
-    await user.keyboard('2'); // "No" — wrong
+    // Options are shuffled, so pick the wrong one by name, not by number.
+    await user.click(screen.getByRole('radio', { name: /No/ }));
     await user.click(screen.getByRole('button', { name: 'Explain this' }));
 
     expect(await screen.findByText(/runs in the stroma, not the thylakoid/)).toBeInTheDocument();

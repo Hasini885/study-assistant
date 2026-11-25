@@ -2,6 +2,7 @@
 // is defined once, on the backend, and imported here through the `@contract`
 // alias so the client validates against the same definition the server does.
 import { isValidStudySet } from '@contract/normalize.js';
+import { connectionErrorMessage } from './messages.js';
 
 /** An error we can show the user, with enough detail to decide about retrying. */
 export class ApiError extends Error {
@@ -32,7 +33,7 @@ async function postJson(url, body, signal) {
     });
   } catch (error) {
     if (error.name === 'AbortError') throw error; // cancellation is not a failure
-    throw new ApiError('offline', 'Could not reach the server. Is it running on port 8787?', { retryable: true });
+    throw new ApiError('offline', connectionErrorMessage(import.meta.env.DEV), { retryable: true });
   }
 
   let payload = null;

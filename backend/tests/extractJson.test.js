@@ -47,6 +47,45 @@ test('replaces smart quotes', () => {
   assert.deepEqual(result.value, { a: 1 });
 });
 
+test('keeps curly quotes inside string values when repairing a truncated response', () => {
+  // Regression: the repair step used to turn every “ and ” into a straight
+  // quote, which ended the string early and made the whole response unparseable.
+  const truncated =
+    '{"title":"Bio","flashcards":[{"front":"What does “ATP” stand for?","back":"Adenosine triphosphate"},' +
+    '{"front":"Define “osmo';
+  const result = extractJson(truncated);
+
+  assert.equal(result.ok, true);
+  assert.equal(result.strategy, 'repaired');
+  assert.equal(result.value.flashcards[0].front, 'What does “ATP” stand for?');
+  assert.equal(result.value.flashcards[0].back, 'Adenosine triphosphate');
+  assert.equal(result.value.flashcards[1].front, 'Define “osmo');
+});
+
+test('keeps curly single quotes inside values when repairing', () => {
+  const result = extractJson('{"front":"Ohm’s law","back":"V = IR",');
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.value, { front: 'Ohm’s law', back: 'V = IR' });
+});
+
+test('handles curly delimiters and curly content in the same response', () => {
+  const result = extractJson('{“front”: "The “mitochondria”", “back”: “Powerhouse”,');
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.value, { front: 'The “mitochondria”', back: 'Powerhouse' });
+});
+
+test('escapes a straight quote inside a curly-delimited string', () => {
+  const result = extractJson('{“a”: “he said "hi"”}');
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.value, { a: 'he said "hi"' });
+});
+
+test('does not rewrite commas, brackets or NaN that are inside string values', () => {
+  const result = extractJson('{"a":"one, ]","b":"value: NaN,","c":[1,2,],');
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.value, { a: 'one, ]', b: 'value: NaN,', c: [1, 2] });
+});
+
 test('converts NaN and undefined to null', () => {
   const result = extractJson('{"a":NaN,"b":undefined}');
   assert.equal(result.ok, true);

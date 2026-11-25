@@ -190,8 +190,10 @@ Four strategies, cheapest first, stopping at the first one that parses:
 3. Slice to the outermost balanced `{…}`, discarding prose like *"Sure! Here are your
    flashcards:"*. The brace scan is string- and escape-aware, so a `}` inside a value doesn't end
    it early.
-4. Repair: smart quotes → straight, `NaN`/`undefined` → `null`, drop trailing commas, and close
-   anything left open by a truncated response.
+4. Repair: smart-quote delimiters → straight, `NaN`/`undefined` → `null`, drop trailing commas, and
+   close anything left open by a truncated response. These rewrites only touch the structure
+   *between* string values — a “curly quote” or a `, ]` inside a card's text is content and is
+   left alone.
 
 Step 4 means a response cut off mid-object still yields the cards that did arrive.
 

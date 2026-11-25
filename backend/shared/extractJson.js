@@ -92,24 +92,106 @@ function sliceToOutermostJson(text) {
   return text.slice(start);
 }
 
-/** Last-resort fixes for output that is *nearly* JSON. */
+/**
+ * Last-resort fixes for output that is *nearly* JSON.
+ *
+ * Every rewrite here applies only to the structure *between* string values.
+ * Inside a string, “curly quotes”, a ", ]" or the word NaN are just content —
+ * rewriting them there corrupts the text at best and, for quotes, ends the
+ * string early and breaks the very parse this is trying to rescue.
+ */
 function repairCommonBreakage(text) {
-  let out = text;
+  // Smart quotes used *as* JSON delimiters, from models that "helpfully"
+  // prettify text. Curly quotes inside a value are left alone.
+  let out = normaliseQuoteDelimiters(text);
 
-  // Smart quotes from models that "helpfully" prettify text.
-  out = out.replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
-
-  // JS literals that aren't valid JSON.
-  out = out.replace(/:\s*(NaN|Infinity|-Infinity|undefined)\s*([,}\]])/g, ': null$2');
-
-  // Trailing commas before a closing brace/bracket.
-  out = out.replace(/,\s*([}\]])/g, '$1');
+  out = mapOutsideStrings(out, (segment) =>
+    segment
+      // JS literals that aren't valid JSON.
+      .replace(/:\s*(NaN|Infinity|-Infinity|undefined)\s*([,}\]])/g, ': null$2')
+      // Trailing commas before a closing brace/bracket.
+      .replace(/,\s*([}\]])/g, '$1')
+  );
 
   // Truncated output: close whatever is still open. Recovers a partial deck
   // instead of throwing the whole response away.
   out = closeUnterminated(out);
 
   return out;
+}
+
+const CURLY_DOUBLE = new Set(['“', '”']);
+
+/**
+ * Turns curly quotes that delimit a string into straight ones, without
+ * touching curly quotes that are part of a string's content.
+ *
+ * Three states: between values, inside a "straight" string, and inside a
+ * string that a curly quote opened. Only the last needs rewriting — its
+ * delimiters become `"`, and any straight `"` inside it is escaped so it stays
+ * content.
+ */
+function normaliseQuoteDelimiters(text) {
+  let out = '';
+  let mode = 'outside'; // outside | straight | curly
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+
+    if (mode === 'outside') {
+      if (char === '"') mode = 'straight';
+      else if (CURLY_DOUBLE.has(char)) {
+        out += '"';
+        mode = 'curly';
+        continue;
+      }
+      out += char;
+    } else if (char === '\\') {
+      // Copy an escape sequence verbatim, whichever kind of string we're in.
+      out += char + (text[i + 1] ?? '');
+      i++;
+    } else if (mode === 'straight') {
+      out += char;
+      if (char === '"') mode = 'outside';
+    } else if (CURLY_DOUBLE.has(char)) {
+      out += '"';
+      mode = 'outside';
+    } else {
+      out += char === '"' ? '\\"' : char;
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Applies `transform` to the parts of `text` that are not inside a string
+ * literal. An unterminated string at the end (a truncated response) counts as
+ * string content and is passed through untouched.
+ */
+function mapOutsideStrings(text, transform) {
+  let out = '';
+  let segmentStart = 0;
+  let inString = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (inString) {
+      if (char === '\\') i++;
+      else if (char === '"') {
+        inString = false;
+        out += text.slice(segmentStart, i + 1);
+        segmentStart = i + 1;
+      }
+    } else if (char === '"') {
+      out += transform(text.slice(segmentStart, i));
+      segmentStart = i;
+      inString = true;
+    }
+  }
+
+  const rest = text.slice(segmentStart);
+  return out + (inString ? rest : transform(rest));
 }
 
 function closeUnterminated(text) {

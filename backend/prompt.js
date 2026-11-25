@@ -16,17 +16,34 @@ const SCHEMA_CONTRACT = `Return ONLY a JSON object with exactly this shape:
   ],
   "quiz": [
     {
+      "type": "mcq",
       "question": "multiple choice question",
       "options": ["option A", "option B", "option C", "option D"],
       "answerIndex": 0,
       "explanation": "one sentence on why that answer is right"
+    },
+    {
+      "type": "truefalse",
+      "question": "a statement that is either true or false",
+      "options": ["True", "False"],
+      "answerIndex": 1,
+      "explanation": "one sentence on why"
+    },
+    {
+      "type": "blank",
+      "question": "a sentence with one key term replaced by _____ .",
+      "answer": "the missing term",
+      "accepted": ["other correct spellings or synonyms"],
+      "explanation": "one sentence on why"
     }
   ]
 }
 
 Hard rules:
 - "answerIndex" is a ZERO-BASED integer index into that question's "options" array. Not a letter, not the answer text, not 1-based.
-- Every question needs exactly 4 distinct options. Exactly one is correct.
+- "mcq" questions need exactly 4 distinct options. Exactly one is correct.
+- "truefalse" options are exactly ["True", "False"]. Make roughly half of them false.
+- "blank" questions contain exactly one _____ and have no options. The answer is a single word or short phrase.
 - Do not prefix options with "A)", "1." or bullets. Just the option text.
 - No markdown, no code fences, no commentary before or after the JSON.`;
 
@@ -57,7 +74,7 @@ const QUESTION_COUNT = 5;
 const SOURCE_RULE = `Because these are the student's own notes, give every flashcard and every quiz question a "source" field: a short quote (one sentence or less, under 25 words) copied WORD FOR WORD from the notes that supports it. Do not paraphrase the quote, do not fix its spelling, and do not quote anything that is not in the notes.`;
 
 export function buildGenerateMessages({ input, withSources = false }) {
-  const task = `Create ${CARD_COUNT} flashcards and ${QUESTION_COUNT} multiple-choice questions from the following.`;
+  const task = `Create ${CARD_COUNT} flashcards and ${QUESTION_COUNT} quiz questions from the following: 3 "mcq", 1 "truefalse" and 1 "blank".`;
   return [
     { role: 'system', content: SYSTEM_PROMPT },
     {
@@ -80,11 +97,14 @@ export function buildRefineMessages({ studySet, instruction }) {
       title: studySet.title,
       summary: studySet.summary,
       flashcards: studySet.flashcards.map(({ id, front, back, hint, source }) => ({ id, front, back, hint, source })),
-      quiz: studySet.quiz.map(({ id, question, options, answerIndex, explanation, source }) => ({
+      quiz: studySet.quiz.map(({ id, type, question, options, answerIndex, answer, accepted, explanation, source }) => ({
         id,
+        type: type ?? 'mcq',
         question,
         options,
         answerIndex,
+        answer,
+        accepted,
         explanation,
         source,
       })),
@@ -112,7 +132,32 @@ export function buildRepairMessages({ previousMessages, badOutput, problem }) {
     { role: 'assistant', content: String(badOutput ?? '').slice(0, 4000) },
     {
       role: 'user',
-      content: `That response was rejected: ${problem}\n\nReturn the same content as a single valid JSON object matching the required shape. Remember: "answerIndex" is a zero-based integer, every question needs 4 distinct options, and the response must contain nothing but the JSON object.`,
+      content: `That response was rejected: ${problem}\n\nReturn the same content as a single valid JSON object matching the required shape. Remember: "answerIndex" is a zero-based integer, "mcq" questions need 4 distinct options, "blank" questions need an "answer", and the response must contain nothing but the JSON object.`,
+    },
+  ];
+}
+
+/**
+ * "Explain this" after a wrong answer. Grounded in the set rather than the
+ * model's general knowledge: the study material is the only source it gets,
+ * so the explanation can't contradict the cards the student is learning from.
+ */
+export function buildExplainMessages({ studySet, question, chosen, correct }) {
+  const material = studySet.flashcards
+    .slice(0, 40)
+    .map((card) => `- ${card.front} — ${card.back}`)
+    .join('\n');
+
+  const options = Array.isArray(question.options) ? `\nOptions: ${question.options.join(' | ')}` : '';
+
+  return [
+    {
+      role: 'system',
+      content: `You are a patient tutor inside a flashcard app. A student just answered a quiz question wrongly. Explain, in at most 3 short sentences (under 80 words), why the correct answer is right and what the student's answer gets wrong. Use ONLY the study material provided; if it doesn't settle the point, say what the material does say rather than adding outside facts. Speak to the student directly. Return ONLY a JSON object: {"explanation": "..."}`,
+    },
+    {
+      role: 'user',
+      content: `Study set: ${studySet.title}\n${studySet.summary ? `Summary: ${studySet.summary}\n` : ''}\nStudy material:\n${material || '(no flashcards)'}\n\nQuestion: ${question.question}${options}\nCorrect answer: ${correct}\nStudent's answer: ${chosen}${question.explanation ? `\nExisting note: ${question.explanation}` : ''}`,
     },
   ];
 }

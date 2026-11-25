@@ -8,12 +8,13 @@
  */
 
 import { callGroq, callGroqStream, hasApiKey, primaryModel, UpstreamError } from './groq.js';
-import { buildGenerateMessages, buildRefineMessages, buildRepairMessages } from './prompt.js';
+import { buildExplainMessages, buildGenerateMessages, buildRefineMessages, buildRepairMessages } from './prompt.js';
 import { createRateLimiter, secondsUntil } from './rateLimit.js';
 import { reconcileIds } from './shared/ids.js';
 import { carryGrounding, looksLikeNotes, verifyGrounding } from './shared/grounding.js';
 import { extractJson } from './shared/extractJson.js';
-import { normalizeStudySet, isValidStudySet, studySetLimitViolation } from './shared/normalize.js';
+import { LIMITS, normalizeStudySet, isValidStudySet, studySetLimitViolation } from './shared/normalize.js';
+import { correctAnswerText } from './shared/quiz.js';
 
 const MAX_INPUT_CHARS = 20_000;
 const MAX_ATTEMPTS = 2; // one initial call, one self-repair
@@ -85,8 +86,10 @@ export async function prepareStudySetRequest({ body, ip, build, limiter = defaul
  * @throws {UpstreamError} a 429 with code `rate_limited` — the same code Groq's
  *   own 429 maps to, so the UI already shows it as "slow down" with a Retry.
  */
-export async function enforceRateLimit(ip, limiter = defaultLimiter()) {
-  const result = await limiter.check(`ip:${ip || 'unknown'}`);
+export async function enforceRateLimit(ip, limiter = defaultLimiter(), scope = '') {
+  // Generation and refinement share one bucket; explanations get their own, so
+  // asking why you got a question wrong never costs you a generation.
+  const result = await limiter.check(`${scope ? `${scope}:` : ''}ip:${ip || 'unknown'}`);
   if (result.success) return;
 
   const retryAfter = secondsUntil(result.reset);
@@ -116,23 +119,7 @@ export function buildGenerateRequest(body) {
 export function buildRefineRequest(body) {
   const { studySet, instruction } = body ?? {};
   assertUsableText(instruction, 'instruction');
-
-  // Never trust the client's copy of the set; it round-tripped through
-  // localStorage and could be anything.
-  if (!isValidStudySet(studySet)) {
-    throw new UpstreamError('bad_request', 'That study set can no longer be refined. Generate a new one.', {
-      status: 400,
-    });
-  }
-
-  // A real set always fits — the normalizer produced it. One that doesn't was
-  // built by hand to make us send the model a huge prompt.
-  const violation = studySetLimitViolation(studySet);
-  if (violation) {
-    throw new UpstreamError('bad_request', `That study set can't be refined — it has ${violation}.`, {
-      status: 400,
-    });
-  }
+  assertClientStudySet(studySet, 'refined');
 
   return {
     messages: buildRefineMessages({ studySet, instruction: instruction.trim() }),
@@ -141,6 +128,81 @@ export function buildRefineRequest(body) {
     // the items they came from.
     previous: studySet,
   };
+}
+
+/**
+ * A study set sent by the browser. Never trusted: it round-tripped through
+ * localStorage (or a share link) and could be anything.
+ * @throws {UpstreamError} 400
+ */
+function assertClientStudySet(studySet, verb) {
+  if (!isValidStudySet(studySet)) {
+    throw new UpstreamError('bad_request', `That study set can no longer be ${verb}. Generate a new one.`, {
+      status: 400,
+    });
+  }
+  // A real set always fits — the normalizer produced it. One that doesn't was
+  // built by hand to make us send the model a huge prompt.
+  const violation = studySetLimitViolation(studySet);
+  if (violation) {
+    throw new UpstreamError('bad_request', `That study set can't be ${verb} — it has ${violation}.`, { status: 400 });
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* explain                                                                    */
+/* -------------------------------------------------------------------------- */
+
+const MAX_EXPLANATION_CHARS = 600;
+
+/**
+ * POST /api/explain — { studySet, questionId, chosen }. The question is looked
+ * up in the (validated) set rather than taken from the body, so the endpoint
+ * can only ever explain a question the set really contains, and everything it
+ * sends the model is bounded by LIMITS.
+ * @throws {UpstreamError} 400 when the request is unusable
+ */
+export function buildExplainRequest(body) {
+  const { studySet, questionId, chosen } = body ?? {};
+  assertClientStudySet(studySet, 'explained');
+
+  const question = studySet.quiz.find((q) => q.id === questionId);
+  if (!question) {
+    throw new UpstreamError('bad_request', 'That question is no longer in this set.', { status: 400 });
+  }
+  if (typeof chosen !== 'string' || !chosen.trim()) {
+    throw new UpstreamError('bad_request', 'Answer the question first.', { status: 400 });
+  }
+  if (chosen.length > LIMITS.option) {
+    throw new UpstreamError('bad_request', `That answer is too long to explain (the limit is ${LIMITS.option} characters).`, {
+      status: 400,
+    });
+  }
+
+  return {
+    messages: buildExplainMessages({ studySet, question, chosen: chosen.trim(), correct: correctAnswerText(question) }),
+  };
+}
+
+/** @returns {Promise<{explanation: string, meta: {model: string}}>} */
+export async function generateExplanation({ messages, signal }) {
+  const completion = await callGroq({ messages, signal, temperature: 0.2, maxTokens: 600 });
+  const extracted = extractJson(completion.content);
+  const raw = extracted.ok ? (extracted.value?.explanation ?? extracted.value?.text) : null;
+  const explanation = typeof raw === 'string' ? raw.replace(/\s+/g, ' ').trim().slice(0, MAX_EXPLANATION_CHARS) : '';
+  if (!explanation) {
+    throw new UpstreamError('unusable_output', 'The model did not return an explanation. Try again.', {
+      status: 502,
+      retryable: true,
+    });
+  }
+  return { explanation, meta: { model: completion.model ?? defaultModel() } };
+}
+
+/** Rate limit, validate, explain. Explanations have their own rate-limit bucket. */
+export async function handleExplainRequest({ body, ip, signal, limiter = defaultLimiter(), generate = generateExplanation }) {
+  await enforceRateLimit(ip, limiter, 'explain');
+  return generate({ ...buildExplainRequest(body), signal });
 }
 
 /* -------------------------------------------------------------------------- */

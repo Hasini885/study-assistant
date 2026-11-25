@@ -19,6 +19,7 @@ import {
   buildGenerateRequest,
   buildRefineRequest,
   errorResponse,
+  handleExplainRequest,
   handleStudySetRequest,
   healthPayload,
 } from './pipeline.js';
@@ -32,11 +33,21 @@ app.use(express.json({ limit: '1mb' }));
 
 app.get('/api/health', (req, res) => res.json(healthPayload()));
 
-app.post('/api/study-set', (req, res) => run(req, res, buildGenerateRequest));
+app.post('/api/study-set', (req, res) => run(req, res, (args) => studySetRoute(args, buildGenerateRequest)));
 
-app.post('/api/refine', (req, res) => run(req, res, buildRefineRequest));
+app.post('/api/refine', (req, res) => run(req, res, (args) => studySetRoute(args, buildRefineRequest)));
 
-async function run(req, res, build) {
+app.post('/api/explain', (req, res) => run(req, res, (args) => handleExplainRequest(args)));
+
+async function studySetRoute({ req, res, body, ip, signal }, build) {
+  if (wantsEventStream(req.headers)) {
+    await streamStudySet({ res, body, ip, build, signal });
+    return undefined; // the stream wrote its own response
+  }
+  return handleStudySetRequest({ body, ip, build, signal });
+}
+
+async function run(req, res, handle) {
   // If the user hits "cancel" or navigates away, stop the upstream call too.
   //
   // This listens on `res`, not `req`: since Node 16 the request stream emits
@@ -49,18 +60,17 @@ async function run(req, res, build) {
     if (!res.writableFinished) controller.abort();
   });
 
-  // The socket address, not X-Forwarded-For: with no trusted proxy in front,
-  // that header is whatever the client wants it to be.
-  const ip = req.ip ?? req.socket.remoteAddress;
-
-  if (wantsEventStream(req.headers)) {
-    await streamStudySet({ res, body: req.body, ip, build, signal: controller.signal });
-    return;
-  }
-
   try {
-    const result = await handleStudySetRequest({ body: req.body, ip, build, signal: controller.signal });
-    if (res.writableEnded) return;
+    const result = await handle({
+      req,
+      res,
+      body: req.body,
+      // The socket address, not X-Forwarded-For: with no trusted proxy in
+      // front, that header is whatever the client wants it to be.
+      ip: req.ip ?? req.socket.remoteAddress,
+      signal: controller.signal,
+    });
+    if (result === undefined || res.writableEnded) return;
     res.json(result);
   } catch (error) {
     if (controller.signal.aborted || error?.code === 'client_aborted') return; // client is gone

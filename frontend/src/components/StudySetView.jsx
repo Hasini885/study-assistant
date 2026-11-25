@@ -5,6 +5,7 @@ import { Quiz } from './Quiz.jsx';
 import { RepairNotice } from './States.jsx';
 import { GroundingSummary } from './SourceBadge.jsx';
 import { hashString } from '@contract/ids.js';
+import { explainAnswer } from '../api/client.js';
 
 const REFINE_EXAMPLES = ['Make the questions harder', 'Add 3 cards about definitions', 'Simplify the wording'];
 
@@ -45,7 +46,11 @@ export function StudySetView({
     () =>
       hashString(
         studySet.quiz
-          .map((q) => [q.id, q.question, ...q.options, q.answerIndex, q.explanation].join('\u0000'))
+          .map((q) =>
+            [q.id, q.type, q.question, ...(q.options ?? []), q.answerIndex, q.answer, ...(q.accepted ?? []), q.explanation].join(
+              '\u0000'
+            )
+          )
           .join('\u0001')
       ),
     [studySet.quiz]
@@ -55,6 +60,11 @@ export function StudySetView({
   useEffect(() => {
     setDeckIndex(0);
   }, [cardsKey]);
+
+  const explain = useCallback(
+    (questionId, chosen, signal) => explainAnswer({ studySet, questionId, chosen }, signal),
+    [studySet]
+  );
 
   const studyCard = useCallback((index) => {
     setDeckIndex(index);
@@ -132,7 +142,7 @@ export function StudySetView({
         )}
 
         {activeTab === 'quiz' && hasQuiz && (
-          <Quiz key={`quiz-${quizKey}`} questions={studySet.quiz} onRoundComplete={onQuizRound} />
+          <Quiz key={`quiz-${quizKey}`} questions={studySet.quiz} onRoundComplete={onQuizRound} onExplain={explain} />
         )}
       </div>
 

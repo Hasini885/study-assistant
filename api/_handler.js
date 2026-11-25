@@ -14,14 +14,34 @@
  */
 
 import 'dotenv/config'; // no-op in production; lets `vercel dev` read .env
-import { errorResponse, handleStudySetRequest } from '../backend/pipeline.js';
+import { errorResponse, handleExplainRequest, handleStudySetRequest } from '../backend/pipeline.js';
 import { clientIpFromHeaders } from '../backend/rateLimit.js';
 import { streamStudySet, wantsEventStream } from '../backend/sse.js';
 
 /**
- * @param {(body: unknown) => {messages: Array, topic: string}} build
+ * /api/study-set and /api/refine: JSON, or server-sent events when asked for.
+ * @param {(body: unknown) => object} build
  */
 export function createStudySetHandler(build) {
+  return post(async ({ req, res, body, ip, signal }) => {
+    if (wantsEventStream(req.headers)) {
+      await streamStudySet({ res, body, ip, build, signal });
+      return undefined; // the stream wrote its own response
+    }
+    return handleStudySetRequest({ body, ip, build, signal });
+  });
+}
+
+/** /api/explain */
+export function createExplainHandler() {
+  return post(({ body, ip, signal }) => handleExplainRequest({ body, ip, signal }));
+}
+
+/**
+ * The plumbing every POST endpoint shares: method check, cancellation when
+ * the client disconnects, the client's IP, and error mapping.
+ */
+function post(run) {
   return async function handler(req, res) {
     if (req.method !== 'POST') {
       res.setHeader('Allow', 'POST');
@@ -34,16 +54,16 @@ export function createStudySetHandler(build) {
       if (!res.writableFinished) controller.abort();
     });
 
-    // Vercel's edge sets these and overwrites any client-supplied value.
-    const ip = clientIpFromHeaders(req.headers, req.socket?.remoteAddress);
-
-    if (wantsEventStream(req.headers)) {
-      return streamStudySet({ res, body: parseBody(req), ip, build, signal: controller.signal });
-    }
-
     try {
-      const result = await handleStudySetRequest({ body: parseBody(req), ip, build, signal: controller.signal });
-      if (res.writableEnded) return undefined;
+      const result = await run({
+        req,
+        res,
+        body: parseBody(req),
+        // Vercel's edge sets these and overwrites any client-supplied value.
+        ip: clientIpFromHeaders(req.headers, req.socket?.remoteAddress),
+        signal: controller.signal,
+      });
+      if (result === undefined || res.writableEnded) return undefined;
       return res.status(200).json(result);
     } catch (error) {
       if (controller.signal.aborted || error?.code === 'client_aborted') return undefined;

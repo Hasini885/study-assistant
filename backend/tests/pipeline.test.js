@@ -291,3 +291,65 @@ test('the default model is one Groq still serves', () => {
     if (saved !== undefined) process.env.GROQ_MODEL = saved;
   }
 });
+
+/* ---------------------------------- explain -------------------------------- */
+
+import { buildExplainRequest, generateExplanation, handleExplainRequest } from '../pipeline.js';
+
+const explainSet = () =>
+  studySet({
+    quiz: [
+      { id: 'q-1', type: 'mcq', ...question },
+      { id: 'q-2', type: 'blank', question: 'The Calvin cycle is in the _____.', answer: 'stroma', accepted: [] },
+    ],
+  });
+
+test('buildExplainRequest grounds the prompt in the set and the chosen answer', () => {
+  const { messages } = buildExplainRequest({ studySet: explainSet(), questionId: 'q-1', chosen: 'Thylakoid' });
+  const user = messages[1].content;
+  assert.match(user, /What is ATP\? — Energy currency\./); // the set's cards are the material
+  assert.match(user, /Correct answer: Stroma/);
+  assert.match(user, /Student's answer: Thylakoid/);
+  assert.match(messages[0].content, /ONLY the study material/);
+});
+
+test('buildExplainRequest works for a typed answer', () => {
+  const { messages } = buildExplainRequest({ studySet: explainSet(), questionId: 'q-2', chosen: 'thylakoid' });
+  assert.match(messages[1].content, /Correct answer: stroma/);
+});
+
+test('buildExplainRequest rejects unknown questions, missing or oversized answers, and bad sets', () => {
+  const cases = [
+    [{ studySet: explainSet(), questionId: 'q-nope', chosen: 'x' }, /no longer in this set/],
+    [{ studySet: explainSet(), questionId: 'q-1', chosen: '  ' }, /Answer the question first/],
+    [{ studySet: explainSet(), questionId: 'q-1', chosen: 'x'.repeat(301) }, /too long/],
+    [{ studySet: { nope: 1 }, questionId: 'q-1', chosen: 'x' }, /can no longer be explained/],
+    [{ studySet: studySet({ flashcards: Array.from({ length: 41 }, (_, i) => ({ front: `${i}`, back: 'b' })) }), questionId: 'q1', chosen: 'x' }, /41 flashcards/],
+  ];
+  for (const [body, pattern] of cases) {
+    const error = badRequest(() => buildExplainRequest(body));
+    assert.equal(error.status, 400);
+    assert.match(error.message, pattern);
+  }
+});
+
+test('generateExplanation returns the model explanation, trimmed and capped', async (t) => {
+  mockGroq(t, JSON.stringify({ explanation: `  The stroma is where it happens.  ${'x'.repeat(1000)}` }));
+  const { explanation } = await generateExplanation({ messages: [] });
+  assert.ok(explanation.startsWith('The stroma is where it happens.'));
+  assert.equal(explanation.length, 600);
+});
+
+test('generateExplanation fails clearly when the model returns nothing usable', async (t) => {
+  mockGroq(t, JSON.stringify({ nope: true }));
+  await assert.rejects(generateExplanation({ messages: [] }), (error) => error.code === 'unusable_output' && error.retryable);
+});
+
+test('explanations are rate limited in their own bucket', async () => {
+  const limiter = denyUntil(Date.now() + 5000);
+  const error = await rejection(
+    handleExplainRequest({ body: { studySet: explainSet(), questionId: 'q-1', chosen: 'x' }, ip: '1.2.3.4', limiter })
+  );
+  assert.equal(error.status, 429);
+  assert.deepEqual(limiter.seen, ['explain:ip:1.2.3.4']);
+});

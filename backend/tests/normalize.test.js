@@ -274,10 +274,10 @@ test('studySetLimitViolation rejects over-long strings in every field', () => {
 });
 
 test('studySetLimitViolation rejects non-text values that would crash the UI', () => {
-  assert.match(
-    studySetLimitViolation(validSet({ quiz: [{ ...goodQuestion, options: ['a', { evil: true }] }] })),
-    /non-text value for option 2/
-  );
+  // An object among the options would crash the UI when rendered, so the
+  // shape check itself refuses it.
+  assert.equal(studySetLimitViolation(validSet({ quiz: [{ ...goodQuestion, options: ['a', { evil: true }] }] })), 'an invalid shape');
+  assert.equal(isValidStudySet(validSet({ quiz: [{ ...goodQuestion, options: ['a', { evil: true }] }] })), false);
   assert.match(studySetLimitViolation(validSet({ title: 42 })), /non-text value for the title/);
 });
 

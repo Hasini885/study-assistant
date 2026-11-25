@@ -13,7 +13,9 @@
  *   title: string,
  *   summary: string,
  *   flashcards: [{ id, front, back, hint }],   ids are stable: see ids.js
- *   quiz: [{ id, question, options: string[], answerIndex: number, explanation }]
+ *   quiz: [{ id, type: 'mcq' | 'truefalse', question, options: string[], answerIndex: number, explanation }
+ *        | { id, type: 'blank', question, answer: string, accepted: string[], explanation }]
+ *   (a quiz item with no type is mcq — see quiz.js)
  *
  * Either kind of item may also carry `source` (a quote from the user's notes,
  * see grounding.js) and, once the server has checked that quote, `grounded`.
@@ -21,6 +23,7 @@
  */
 
 import { claimUniqueId, contentId, isWellFormedId } from './ids.js';
+import { TRUE_FALSE_OPTIONS, hasGap, normalizeGaps } from './quiz.js';
 
 export const LIMITS = {
   title: 120,
@@ -32,6 +35,7 @@ export const LIMITS = {
   maxQuizQuestions: 30,
   minOptions: 2,
   maxOptions: 6,
+  maxAccepted: 5,
 };
 
 /** @returns {{ok: true, data: object, repairs: string[]} | {ok: false, reason: string, repairs: string[]}} */
@@ -149,44 +153,22 @@ function normalizeQuiz(list, repairs) {
       continue;
     }
 
-    const rawOptions = pickArray(item, ['options', 'choices', 'answers', 'alternatives']);
-    // Options sometimes arrive as objects ({text, correct}) or as "A) Paris".
-    const options = [];
-    let correctFromObject = -1;
-    for (const opt of rawOptions) {
-      if (options.length >= LIMITS.maxOptions) break;
-      let text;
-      if (isPlainObject(opt)) {
-        text = cleanString(pick(opt, ['text', 'option', 'label', 'value', 'answer']), LIMITS.option);
-        if (correctFromObject === -1 && isTruthy(pick(opt, ['correct', 'isCorrect', 'is_correct']))) {
-          correctFromObject = options.length;
-        }
-      } else {
-        text = cleanString(opt, LIMITS.option);
-      }
-      text = stripOptionLabel(text);
-      if (!text) continue;
-      // Case-insensitive dedupe: duplicate options make a question unanswerable.
-      if (options.some((o) => o.toLowerCase() === text.toLowerCase())) continue;
-      options.push(text);
-    }
+    const { options, correctFromObject } = readOptions(item);
+    const shape = detectType(item, question, options);
 
-    if (options.length < LIMITS.minOptions) {
-      dropped++;
-      continue;
-    }
+    let body;
+    if (shape === 'blank') body = normalizeBlank(item, question);
+    else if (shape === 'truefalse') body = normalizeTrueFalse(item, question, options, correctFromObject);
+    else body = normalizeChoice(item, question, options, correctFromObject);
 
-    const answerIndex = resolveAnswerIndex(item, options, correctFromObject);
-    if (answerIndex === -1) {
+    if (!body) {
       dropped++;
       continue;
     }
 
     out.push({
-      id: itemId(item, 'q', question, usedIds),
-      question,
-      options,
-      answerIndex,
+      id: itemId(item, 'q', body.question, usedIds),
+      ...body,
       explanation: cleanString(pick(item, ['explanation', 'rationale', 'why', 'reason']), LIMITS.text),
       ...sourceField(item),
     });
@@ -194,6 +176,97 @@ function normalizeQuiz(list, repairs) {
 
   if (dropped > 0) repairs.push(`Skipped ${dropped} unanswerable quiz question${dropped === 1 ? '' : 's'}.`);
   return out;
+}
+
+/** Options sometimes arrive as objects ({text, correct}) or as "A) Paris". */
+function readOptions(item) {
+  const rawOptions = pickArray(item, ['options', 'choices', 'answers', 'alternatives']);
+  const options = [];
+  let correctFromObject = -1;
+  for (const opt of rawOptions) {
+    if (options.length >= LIMITS.maxOptions) break;
+    let text;
+    if (isPlainObject(opt)) {
+      text = cleanString(pick(opt, ['text', 'option', 'label', 'value', 'answer']), LIMITS.option);
+      if (correctFromObject === -1 && isTruthy(pick(opt, ['correct', 'isCorrect', 'is_correct']))) {
+        correctFromObject = options.length;
+      }
+    } else {
+      text = cleanString(opt, LIMITS.option);
+    }
+    text = stripOptionLabel(text);
+    if (!text) continue;
+    // Case-insensitive dedupe: duplicate options make a question unanswerable.
+    if (options.some((o) => o.toLowerCase() === text.toLowerCase())) continue;
+    options.push(text);
+  }
+  return { options, correctFromObject };
+}
+
+/**
+ * Which kind of question this is. An explicit `type` wins (under any of the
+ * names models use for it); otherwise the shape decides — True/False options,
+ * or a gap in the question with a typed answer and no options.
+ */
+function detectType(item, question, options) {
+  const declared = String(pick(item, ['type', 'kind', 'format', 'questionType', 'question_type']) ?? '').toLowerCase();
+  if (/blank|fill|cloze|gap|short/.test(declared)) return 'blank';
+  if (/true|false|\btf\b|bool/.test(declared)) return 'truefalse';
+
+  const lower = options.map((o) => o.toLowerCase());
+  if (options.length === 2 && lower.includes('true') && lower.includes('false')) return 'truefalse';
+  if (options.length === 0 && typeof pick(item, ['answer', 'correctAnswer', 'correct_answer']) === 'boolean') {
+    return 'truefalse';
+  }
+  if (options.length === 0 && hasGap(question)) return 'blank';
+  return 'mcq';
+}
+
+function normalizeChoice(item, question, options, correctFromObject) {
+  if (options.length < LIMITS.minOptions) return null;
+  const answerIndex = resolveAnswerIndex(item, options, correctFromObject);
+  if (answerIndex === -1) return null;
+  return { type: 'mcq', question, options, answerIndex };
+}
+
+/** Always stored as ['True', 'False'] so the answer index means the same thing everywhere. */
+function normalizeTrueFalse(item, question, options, correctFromObject) {
+  let isTrue = null;
+
+  if (options.length >= 2) {
+    const index = resolveAnswerIndex(item, options, correctFromObject);
+    if (index !== -1) isTrue = options[index].toLowerCase() === 'true';
+  }
+  if (isTrue === null) {
+    const raw = pick(item, ['answer', 'correctAnswer', 'correct_answer', 'correct', 'solution', 'isTrue', 'is_true']);
+    if (typeof raw === 'boolean') isTrue = raw;
+    else if (typeof raw === 'string') {
+      const value = raw.trim().toLowerCase().replace(/[.!]$/, '');
+      if (['true', 't', 'yes'].includes(value)) isTrue = true;
+      else if (['false', 'f', 'no'].includes(value)) isTrue = false;
+    }
+  }
+  if (isTrue === null) return null;
+
+  return { type: 'truefalse', question, options: [...TRUE_FALSE_OPTIONS], answerIndex: isTrue ? 0 : 1 };
+}
+
+function normalizeBlank(item, question) {
+  const answer = cleanString(
+    pick(item, ['answer', 'correctAnswer', 'correct_answer', 'solution', 'blank', 'expected']),
+    LIMITS.option
+  );
+  if (!answer) return null;
+
+  const accepted = [];
+  for (const alt of pickArray(item, ['acceptedAnswers', 'accepted_answers', 'accepted', 'alternatives', 'answers', 'synonyms'])) {
+    const text = cleanString(alt, LIMITS.option);
+    if (!text || accepted.length >= LIMITS.maxAccepted) continue;
+    if ([answer, ...accepted].some((a) => a.toLowerCase() === text.toLowerCase())) continue;
+    accepted.push(text);
+  }
+
+  return { type: 'blank', question: normalizeGaps(question), answer, accepted };
 }
 
 /**
@@ -418,6 +491,20 @@ export function studySetLimitViolation(value) {
 
   for (const [i, q] of quiz.entries()) {
     const where = `question ${i + 1}`;
+    if (q.type === 'blank') {
+      if (q.accepted && q.accepted.length > LIMITS.maxAccepted) {
+        return `${q.accepted.length} accepted answers in ${where} (the limit is ${LIMITS.maxAccepted})`;
+      }
+      const problem =
+        textProblem(q.question, where, LIMITS.text) ||
+        textProblem(q.answer, `${where}'s answer`, LIMITS.option) ||
+        textProblem(q.explanation, `${where}'s explanation`, LIMITS.text, { optional: true }) ||
+        textProblem(q.source, `${where}'s source`, LIMITS.source, { optional: true }) ||
+        flagProblem(q.grounded, `${where}'s grounded flag`) ||
+        (q.accepted ?? []).reduce((found, alt, n) => found || textProblem(alt, `accepted answer ${n + 1} of ${where}`, LIMITS.option), null);
+      if (problem) return problem;
+      continue;
+    }
     if (q.options.length > LIMITS.maxOptions) {
       return `${q.options.length} options in ${where} (the limit is ${LIMITS.maxOptions})`;
     }
@@ -444,6 +531,26 @@ function textProblem(value, label, max, { optional = false } = {}) {
   return null;
 }
 
+function isValidQuestion(q) {
+  if (!isPlainObject(q) || typeof q.question !== 'string') return false;
+  if (q.type === 'blank') {
+    return (
+      typeof q.answer === 'string' &&
+      q.answer.trim() !== '' &&
+      (q.accepted === undefined || (Array.isArray(q.accepted) && q.accepted.every((a) => typeof a === 'string')))
+    );
+  }
+  return (
+    (q.type === undefined || q.type === 'mcq' || q.type === 'truefalse') &&
+    Array.isArray(q.options) &&
+    q.options.length >= LIMITS.minOptions &&
+    q.options.every((o) => typeof o === 'string') &&
+    Number.isInteger(q.answerIndex) &&
+    q.answerIndex >= 0 &&
+    q.answerIndex < q.options.length
+  );
+}
+
 /**
  * Cheap client-side guard. The server already normalizes, but the client
  * shouldn't trust that a response on the wire matches what it expects.
@@ -454,16 +561,7 @@ export function isValidStudySet(value) {
     Array.isArray(value.flashcards) &&
     Array.isArray(value.quiz) &&
     value.flashcards.every((c) => isPlainObject(c) && typeof c.front === 'string' && typeof c.back === 'string') &&
-    value.quiz.every(
-      (q) =>
-        isPlainObject(q) &&
-        typeof q.question === 'string' &&
-        Array.isArray(q.options) &&
-        q.options.length >= LIMITS.minOptions &&
-        Number.isInteger(q.answerIndex) &&
-        q.answerIndex >= 0 &&
-        q.answerIndex < q.options.length
-    ) &&
+    value.quiz.every(isValidQuestion) &&
     value.flashcards.length + value.quiz.length > 0
   );
 }

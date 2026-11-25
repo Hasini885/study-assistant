@@ -147,6 +147,22 @@ export function refineStudySet({ studySet, instruction }, signal) {
   return postJson('/api/refine', { studySet, instruction }, signal);
 }
 
+/** A short explanation of why `chosen` was wrong, grounded in the set. */
+export async function explainAnswer({ studySet, questionId, chosen }, signal) {
+  const response = await post('/api/explain', { studySet, questionId, chosen }, signal, 'application/json');
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
+  if (!response.ok || payload?.error) throw toApiError(payload?.error, response.status);
+  if (typeof payload?.explanation !== 'string' || !payload.explanation) {
+    throw new ApiError('bad_payload', 'The server returned an explanation in an unexpected format.', { retryable: true });
+  }
+  return payload.explanation;
+}
+
 export async function fetchHealth(signal) {
   try {
     const response = await fetch('/api/health', { signal });

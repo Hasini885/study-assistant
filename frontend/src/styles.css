@@ -2817,3 +2817,40 @@ kbd {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* ------------------------------------------------------------ file upload -- */
+
+.prompt-form__field.is-dragging .prompt-form__textarea {
+  border-color: var(--accent);
+  border-style: dashed;
+  background: var(--accent-soft);
+}
+
+.prompt-form__upload {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-top: 8px;
+}
+
+.prompt-form__upload-note {
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.prompt-form__upload-note .is-error,
+.prompt-form__help.is-over {
+  color: var(--wrong);
+}
+
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}

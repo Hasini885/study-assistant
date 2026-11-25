@@ -1,0 +1,116 @@
+/* ------------------------------------------------------------- prompt form */
+
+.prompt-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hero .prompt-form {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+
+.prompt-form__label {
+  font-weight: 600;
+  font-size: 0.92rem;
+}
+
+.panel .prompt-form__label {
+  display: none;
+}
+
+.prompt-form__field {
+  position: relative;
+}
+
+.prompt-form__textarea {
+  width: 100%;
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 12px 26px;
+  resize: vertical;
+  min-height: 84px;
+}
+
+.panel .prompt-form__textarea {
+  background: var(--surface);
+  font-size: 0.88rem;
+}
+
+.prompt-form__textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+
+.prompt-form__count {
+  position: absolute;
+  right: 10px;
+  bottom: 8px;
+  font-size: 0.72rem;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.prompt-form__count.is-over {
+  color: var(--wrong);
+  font-weight: 600;
+}
+
+.prompt-form__help {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.prompt-form__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.panel .prompt-form__actions .btn--primary {
+  flex: 1;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  font: inherit;
+  font-size: 0.78rem;
+  color: var(--muted);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 11px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.chip:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.chip.is-active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.chip__count {
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}

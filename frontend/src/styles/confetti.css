@@ -1,0 +1,98 @@
+/* ---------------------------------------------------------------- confetti */
+
+.results {
+  position: relative;
+}
+
+.confetti {
+  position: absolute;
+  left: 42px;
+  top: 42px;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.confetti__bit {
+  position: absolute;
+  width: 9px;
+  height: 14px;
+  border-radius: 2px;
+  animation: burst 2.2s cubic-bezier(0.15, 0.65, 0.35, 1) backwards;
+  animation-delay: var(--delay);
+}
+
+.confetti__bit--0 {
+  background: var(--accent);
+}
+
+.confetti__bit--1 {
+  background: var(--correct);
+}
+
+.confetti__bit--2 {
+  background: var(--warn);
+}
+
+.confetti__bit--3 {
+  background: var(--wrong);
+}
+
+@keyframes burst {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(0deg) scale(var(--scale));
+  }
+  35% {
+    opacity: 1;
+    transform: translate(calc(var(--x) * 0.6), var(--y)) rotate(calc(var(--turn) * 0.4)) scale(var(--scale));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--x), 240px) rotate(var(--turn)) scale(var(--scale));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  /* Keep the flip functional without the rotation. */
+  .card__inner {
+    transform: none !important;
+  }
+
+  .card.is-flipped .card__face--front {
+    visibility: hidden;
+  }
+
+  .card__face--back {
+    transform: none;
+    visibility: hidden;
+  }
+
+  .card.is-flipped .card__face--back {
+    visibility: visible;
+  }
+
+  /* Kill the ambient drift and the shimmer outright rather than just
+     shortening them — a 0.01ms infinite loop is still a repaint every frame. */
+  body::before,
+  .progress__bar::after,
+  .landing__card,
+  .marquee__track {
+    animation: none;
+  }
+
+  /* Parallax is pointer-driven, not time-driven, so it needs cancelling too. */
+  .landing__inner,
+  .landing__deck {
+    translate: none;
+  }
+}

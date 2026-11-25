@@ -1,0 +1,37 @@
+/*
+ * The stylesheet, one file per part of the UI.
+ *
+ * Imported in this exact order: it is the original single stylesheet split at
+ * its section boundaries, so the cascade - and the app's appearance - is
+ * unchanged. Later files can rely on overriding earlier ones (responsive.css
+ * and motion.css, for example, adjust rules from the component files above them).
+ */
+
+@import './tokens.css';
+@import './shell.css';
+@import './buttons.css';
+@import './hero.css';
+@import './prompt-form.css';
+@import './states.css';
+@import './banners.css';
+@import './workspace.css';
+@import './deck.css';
+@import './browse.css';
+@import './quiz.css';
+@import './results.css';
+@import './refine.css';
+@import './sessions.css';
+@import './wide-screens.css';
+@import './responsive.css';
+@import './landing.css';
+@import './art-direction.css';
+@import './motion.css';
+@import './confetti.css';
+@import './spaced-repetition.css';
+@import './upload.css';
+@import './grounding.css';
+@import './streaming.css';
+@import './quiz-types.css';
+@import './share-export.css';
+@import './print.css';
+@import './sidebar-footer.css';

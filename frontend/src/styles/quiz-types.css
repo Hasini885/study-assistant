@@ -1,0 +1,75 @@
+/* ------------------------------------------------------------ quiz types -- */
+
+.quiz__type {
+  color: var(--muted);
+}
+
+/* True / false: two big side-by-side answers, even on a narrow column. */
+.options.options--tf {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.blank {
+  display: flex;
+  gap: 8px;
+}
+
+.blank__input {
+  flex: 1;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 11px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem;
+}
+
+.blank__input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.blank__input.is-correct {
+  border-color: var(--correct);
+  background: var(--correct-soft);
+}
+
+.blank__input.is-wrong {
+  border-color: var(--wrong);
+  background: var(--wrong-soft);
+  animation: shake 0.35s ease;
+}
+
+/* "Explain this" — a follow-up inside the feedback panel. */
+.explain {
+  margin-top: 10px;
+}
+
+.explain--action {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.explain__label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.explain__text {
+  margin: 2px 0 0;
+  animation: riseIn 0.3s ease backwards;
+}
+
+.explain__error {
+  font-size: 0.8rem;
+  color: var(--wrong);
+}

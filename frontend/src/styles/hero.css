@@ -1,0 +1,25 @@
+/* -------------------------------------------------------------------- hero */
+
+/* The hero stays centred and measured: a textarea the width of a 4K monitor
+   would be worse, not better. Everything after generation fills the screen. */
+.hero {
+  max-width: 860px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding-top: 3vh;
+}
+
+.hero__title {
+  font-size: 1.75rem;
+  letter-spacing: -0.025em;
+}
+
+.hero__lede {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+  max-width: 52ch;
+}

@@ -1,0 +1,100 @@
+/* --------------------------------------------------------------- workspace */
+
+.workspace {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.workspace__header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.workspace__title {
+  font-size: 1.35rem;
+  letter-spacing: -0.02em;
+}
+
+.workspace__summary {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  max-width: 62ch;
+}
+
+.workspace__body {
+  position: relative;
+  transition: opacity 0.2s;
+}
+
+.workspace__body.is-busy {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.workspace__overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  color: var(--muted);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--surface-2);
+  padding: 4px;
+  border-radius: 12px;
+}
+
+.tab {
+  flex: 1;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-radius: 9px;
+  padding: 8px 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tab.is-active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.tab:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.tab__count {
+  font-size: 0.75rem;
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 0 7px;
+}
+
+.tab.is-active .tab__count {
+  background: var(--accent-soft);
+  color: var(--accent);
+}

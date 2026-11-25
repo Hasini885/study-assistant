@@ -1,0 +1,166 @@
+/* ------------------------------------------------------------------ states */
+
+.state {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.state--error {
+  border-color: color-mix(in srgb, var(--wrong) 40%, var(--border));
+  background: color-mix(in srgb, var(--wrong-soft) 60%, var(--surface));
+}
+
+.state__header {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.state__title {
+  font-size: 1.05rem;
+}
+
+.state__message,
+.state__note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.state__timer {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+.state__icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--wrong);
+  color: #fff;
+  font-weight: 700;
+}
+
+.state__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.state__hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.state__trace {
+  width: 100%;
+  overflow-x: auto;
+  font-size: 0.75rem;
+  color: var(--muted);
+  background: var(--surface-2);
+  padding: 8px 10px;
+  border-radius: 8px;
+  margin: 0;
+}
+
+/* Empty state: what you'll get, rather than a restatement of the hero. */
+.perks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.perk {
+  padding: 13px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+}
+
+.perk__icon {
+  font-size: 1.05rem;
+}
+
+.perk__title {
+  display: block;
+  font-weight: 600;
+  font-size: 0.88rem;
+  margin-top: 5px;
+}
+
+.perk__text {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.skeleton-card {
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 14px;
+  display: grid;
+  gap: 8px;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.skeleton-line {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--border);
+}
+
+.skeleton-line--short {
+  width: 35%;
+}
+
+.skeleton-line--medium {
+  width: 70%;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}

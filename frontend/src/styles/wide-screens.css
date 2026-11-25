@@ -1,0 +1,30 @@
+/* ----------------------------------------------------------- wide screens -- */
+
+@media (min-width: 1000px) {
+  /* Two columns of answers once there is room. Four stacked options waste a
+     wide screen and push the feedback panel below the fold. */
+  .options {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
+
+  .results__ring {
+    width: 96px;
+    height: 96px;
+  }
+}
+
+@media (min-width: 1100px) {
+  .deck__layout {
+    grid-template-columns: minmax(0, 1fr) clamp(240px, 22vw, 340px);
+  }
+
+  .rail {
+    display: block;
+  }
+
+  /* The rail supersedes the jump bar rather than duplicating it. */
+  .jumpbar {
+    display: none;
+  }
+}

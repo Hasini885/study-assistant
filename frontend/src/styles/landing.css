@@ -1,0 +1,300 @@
+/* ---------------------------------------------------------------- landing -- */
+
+.landing {
+  position: relative;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 6vh clamp(20px, 5vw, 72px) 96px;
+  overflow: hidden;
+  text-align: center;
+}
+
+/*
+  Parallax. Two planes moving opposite ways off one pointer position: the card
+  layer leads, the wordmark counter-moves by less. `translate` as an individual
+  property so it composes with the cards' own float animation instead of
+  overwriting it, and a long transition so the motion glides rather than
+  tracking the cursor 1:1.
+*/
+.landing__inner {
+  position: relative;
+  z-index: 2;
+  max-width: min(1200px, 92vw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  translate: calc(var(--px, 0) * -14px) calc(var(--py, 0) * -10px);
+  transition: translate 0.6s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+/* The example topic cycles, so the page is never completely static. */
+.landing__topic {
+  display: inline-block;
+  color: var(--accent);
+  font-weight: 600;
+  animation: topicIn 0.45s cubic-bezier(0.2, 0.9, 0.3, 1) backwards;
+}
+
+@keyframes topicIn {
+  from {
+    opacity: 0;
+    transform: translateY(0.5em) rotate(-2.5deg);
+    filter: blur(4px);
+  }
+}
+
+.landing__eyebrow {
+  margin: 0;
+  font-size: clamp(0.68rem, 1.3vw, 0.84rem);
+  font-weight: 700;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--muted);
+  animation: fadeUp 0.5s ease backwards;
+  animation-delay: 0.08s;
+}
+
+/*
+  The wordmark. Sized in vw so it always reads as full-bleed display type, with
+  clamp caps at both ends: the upper bound stops "ASSISTANT" (nine characters)
+  running past the viewport on a wide monitor.
+*/
+.landing__wordmark {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: clamp(2.4rem, 10.5vw, 8.5rem);
+  font-weight: 800;
+  line-height: 0.85;
+  letter-spacing: -0.045em;
+  text-transform: uppercase;
+}
+
+.landing__word {
+  display: block;
+  white-space: nowrap;
+}
+
+.landing__word--accent {
+  color: var(--accent);
+}
+
+.landing__char {
+  display: inline-block;
+  animation: charRise 0.62s cubic-bezier(0.2, 0.85, 0.3, 1) backwards;
+  animation-delay: calc(var(--i, 0) * 42ms + 140ms);
+}
+
+@keyframes charRise {
+  from {
+    opacity: 0;
+    transform: translateY(0.42em) rotate(7deg);
+  }
+}
+
+.landing__lede {
+  margin: 0;
+  max-width: 54ch;
+  color: var(--muted);
+  font-size: clamp(0.95rem, 1.5vw, 1.12rem);
+  animation: fadeUp 0.5s ease backwards;
+  animation-delay: 0.75s;
+}
+
+.landing__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+  animation: fadeUp 0.5s ease backwards;
+  animation-delay: 0.88s;
+}
+
+.btn--hero {
+  font-size: 1rem;
+  padding: 14px 30px;
+  border-radius: 12px;
+}
+
+.landing__hint {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+  animation: fadeUp 0.5s ease backwards;
+  animation-delay: 1s;
+}
+
+/* Index cards drifting behind the wordmark. */
+.landing__deck {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  translate: calc(var(--px, 0) * 30px) calc(var(--py, 0) * 22px);
+  transition: translate 0.5s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.landing__card {
+  position: absolute;
+  width: clamp(110px, 15vw, 220px);
+  aspect-ratio: 5 / 3.4;
+  border-radius: 16px;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  opacity: 0.5;
+  /* `rotate` and `translate` as individual properties, so the float animation
+     doesn't clobber each card's fixed tilt the way a transform shorthand would. */
+  animation: floatCard 9s ease-in-out infinite alternate;
+}
+
+.landing__card--1 {
+  top: 13%;
+  left: 6%;
+  rotate: -14deg;
+}
+
+.landing__card--2 {
+  bottom: 15%;
+  right: 7%;
+  rotate: 11deg;
+  animation-delay: -3s;
+}
+
+.landing__card--3 {
+  top: 64%;
+  left: 13%;
+  rotate: 6deg;
+  opacity: 0.3;
+  animation-delay: -6s;
+}
+
+@keyframes floatCard {
+  from {
+    translate: 0 0;
+  }
+  to {
+    translate: 0 -20px;
+  }
+}
+
+/* Editorial ticker along the bottom. */
+.marquee {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  padding: 13px 0;
+  overflow: hidden;
+  border-top: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  /* Fade both ends so items enter and leave instead of popping at the edge. */
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+}
+
+.marquee__track {
+  display: flex;
+  width: max-content;
+  /* The list is rendered twice, so -50% lands exactly on the seam. */
+  animation: scrollX 30s linear infinite;
+}
+
+.marquee__item {
+  position: relative;
+  padding: 0 30px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.marquee__item::after {
+  content: '◆';
+  position: absolute;
+  right: -5px;
+  color: var(--accent);
+  opacity: 0.55;
+  letter-spacing: 0;
+}
+
+@keyframes scrollX {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* ---- exit: the page scatters on the way out ---- */
+
+.landing.is-leaving .landing__inner {
+  animation: leaveUp 0.42s cubic-bezier(0.4, 0, 0.7, 0.2) forwards;
+}
+
+.landing.is-leaving .marquee {
+  animation: leaveDown 0.42s ease forwards;
+}
+
+.landing.is-leaving .landing__card--1 {
+  animation: scatterLeft 0.42s cubic-bezier(0.4, 0, 0.8, 0.4) forwards;
+}
+
+.landing.is-leaving .landing__card--2 {
+  animation: scatterRight 0.42s cubic-bezier(0.4, 0, 0.8, 0.4) forwards;
+}
+
+.landing.is-leaving .landing__card--3 {
+  animation: scatterLeft 0.42s cubic-bezier(0.4, 0, 0.8, 0.4) forwards;
+  animation-delay: 0.04s;
+}
+
+@keyframes leaveUp {
+  to {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.96);
+  }
+}
+
+@keyframes leaveDown {
+  to {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+}
+
+@keyframes scatterLeft {
+  to {
+    translate: -46vw 12vh;
+    rotate: -48deg;
+    opacity: 0;
+  }
+}
+
+@keyframes scatterRight {
+  to {
+    translate: 46vw 14vh;
+    rotate: 42deg;
+    opacity: 0;
+  }
+}
+
+@media (max-width: 700px) {
+  .landing__card--3 {
+    display: none;
+  }
+
+  .landing__card {
+    opacity: 0.28;
+  }
+
+  .marquee__item {
+    padding: 0 20px;
+    font-size: 0.66rem;
+  }
+}

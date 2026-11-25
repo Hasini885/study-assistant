@@ -1,0 +1,108 @@
+/* ------------------------------------------------------- responsive shell -- */
+
+@media (max-width: 900px) {
+  /* The shell unwinds: normal page scroll, sidebar becomes a drawer. */
+  .app {
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+  }
+
+  .topbar__menu {
+    display: inline-flex;
+  }
+
+  .topbar__tagline {
+    display: none;
+  }
+
+  .app__body {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(320px, 86vw);
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    box-shadow: var(--shadow-lg);
+    padding-top: 20px;
+  }
+
+  .sidebar.is-open {
+    transform: none;
+  }
+
+  .scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgb(0 0 0 / 45%);
+    z-index: 40;
+  }
+
+  .main {
+    overflow: visible;
+    padding: 18px 16px 48px;
+  }
+}
+
+@media (max-width: 560px) {
+  .topbar {
+    padding: 0 10px;
+  }
+
+  .main {
+    padding: 14px 12px 40px;
+  }
+
+  .workspace__header {
+    flex-direction: column;
+  }
+
+  .deck__marks,
+  .results__actions,
+  .state__actions {
+    flex-direction: column;
+  }
+
+  .deck__meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+
+  .refine__row {
+    flex-direction: column;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+
+  .card,
+  .card__inner {
+    min-height: 280px;
+  }
+
+  .card__text {
+    font-size: 1.12rem;
+  }
+
+  .hero__title {
+    font-size: 1.4rem;
+  }
+
+  .prompt-form__actions .btn--primary {
+    flex: 1;
+  }
+}

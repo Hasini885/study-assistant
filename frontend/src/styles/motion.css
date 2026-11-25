@@ -1,0 +1,177 @@
+/* ----------------------------------------------------------------- motion -- */
+
+/*
+  Entrance animations use `backwards`, not `both`: the fill would otherwise
+  hold the final transform after the animation ends and beat :hover transforms
+  further down the cascade. `backwards` only applies the `from` state during
+  the stagger delay, which is all we need.
+*/
+
+@keyframes riseIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes slideInNext {
+  from {
+    opacity: 0;
+    transform: translateX(48px) scale(0.96);
+  }
+}
+
+@keyframes slideInPrev {
+  from {
+    opacity: 0;
+    transform: translateX(-48px) scale(0.96);
+  }
+}
+
+@keyframes popIn {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+@keyframes shake {
+  10%,
+  90% {
+    transform: translateX(-3px);
+  }
+  20%,
+  80% {
+    transform: translateX(5px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translateX(-7px);
+  }
+  40%,
+  60% {
+    transform: translateX(7px);
+  }
+}
+
+@keyframes popCorrect {
+  45% {
+    transform: scale(1.025);
+  }
+}
+
+@keyframes shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* Card travel — the incoming card flies in from the side you moved toward. */
+.deck__slide {
+  animation: slideInNext 0.34s cubic-bezier(0.2, 0.8, 0.3, 1) backwards;
+}
+
+.deck__slide[data-dir='prev'] {
+  animation-name: slideInPrev;
+}
+
+/* Staggered entrances */
+.option {
+  animation: riseIn 0.3s ease backwards;
+  animation-delay: calc(var(--i, 0) * 55ms);
+}
+
+.tile {
+  animation: riseIn 0.32s ease backwards;
+  animation-delay: calc(var(--i, 0) * 26ms);
+}
+
+.review-item {
+  animation: riseIn 0.3s ease backwards;
+  animation-delay: calc(var(--i, 0) * 32ms);
+}
+
+.rail__item {
+  animation: riseIn 0.26s ease backwards;
+  animation-delay: calc(var(--i, 0) * 14ms);
+}
+
+.perk {
+  animation: riseIn 0.34s ease backwards;
+}
+
+.perk:nth-child(2) {
+  animation-delay: 70ms;
+}
+
+.perk:nth-child(3) {
+  animation-delay: 140ms;
+}
+
+.hero,
+.workspace,
+.workspace__body > * {
+  animation: fadeUp 0.32s ease backwards;
+}
+
+/* Answer feedback */
+.option.is-wrong {
+  animation: shake 0.38s ease;
+}
+
+.option.is-correct {
+  animation: popCorrect 0.4s ease;
+}
+
+.pill--streak {
+  background: var(--warn-soft);
+  color: var(--warn);
+  animation: popIn 0.32s cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+
+.quiz__badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.results__streak {
+  margin: 4px 0 0;
+  font-size: 0.84rem;
+  color: var(--warn);
+  font-weight: 600;
+}
+
+/* Progress bars get a travelling highlight while they're on screen. */
+.progress__bar {
+  position: relative;
+  overflow: hidden;
+}
+
+.progress__bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 38%), transparent);
+  animation: shimmer 1.9s linear infinite;
+}
+
+.btn--primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.tab {
+  position: relative;
+}

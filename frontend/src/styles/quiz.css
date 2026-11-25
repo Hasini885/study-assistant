@@ -1,0 +1,148 @@
+/* -------------------------------------------------------------------- quiz */
+
+.quiz {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.quiz__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.quiz__question {
+  font-size: 1.18rem;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+.pill {
+  font-size: 0.72rem;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.progress {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.progress__bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.options {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: inherit;
+  font-size: 0.94rem;
+  text-align: left;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 11px;
+  padding: 13px 14px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+}
+
+.option:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  transform: translateX(2px);
+}
+
+.option:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.option__text {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+
+.option__mark {
+  font-weight: 700;
+}
+
+.option.is-correct {
+  border-color: var(--correct);
+  background: var(--correct-soft);
+  color: var(--correct);
+}
+
+.option.is-wrong {
+  border-color: var(--wrong);
+  background: var(--wrong-soft);
+  color: var(--wrong);
+}
+
+.feedback {
+  border-radius: 11px;
+  padding: 12px 14px;
+  font-size: 0.88rem;
+  border: 1px solid transparent;
+  animation: rise 0.25s ease;
+}
+
+.feedback p {
+  margin: 4px 0 0;
+}
+
+.feedback.is-correct {
+  background: var(--correct-soft);
+  border-color: color-mix(in srgb, var(--correct) 35%, transparent);
+}
+
+.feedback.is-wrong {
+  background: var(--wrong-soft);
+  border-color: color-mix(in srgb, var(--wrong) 35%, transparent);
+}
+
+.feedback__explanation {
+  color: var(--muted);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.quiz__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.quiz__hint {
+  font-size: 0.78rem;
+  color: var(--muted);
+}

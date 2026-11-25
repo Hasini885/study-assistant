@@ -1,0 +1,91 @@
+/* --------------------------------------------------------------- printing -- */
+
+.printable {
+  display: none;
+}
+
+@media print {
+  :root {
+    color-scheme: light;
+  }
+
+  html,
+  body,
+  #root,
+  .app,
+  .app__body,
+  .main {
+    height: auto !important;
+    overflow: visible !important;
+    display: block !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  body::before,
+  body::after,
+  .topbar,
+  .sidebar,
+  .scrim,
+  .banner,
+  .workspace__header,
+  .tabs,
+  .workspace__body,
+  .refine,
+  .grounding-summary {
+    display: none !important;
+  }
+
+  .main {
+    padding: 0 !important;
+  }
+
+  .printable {
+    display: block;
+    font-family: var(--font-display);
+    font-size: 11pt;
+    line-height: 1.45;
+  }
+
+  .printable h1 {
+    font-size: 20pt;
+    margin: 0 0 4pt;
+  }
+
+  .printable h2 {
+    font-size: 13pt;
+    margin: 18pt 0 8pt;
+    border-bottom: 1px solid #999;
+    padding-bottom: 3pt;
+  }
+
+  .printable__summary,
+  .printable__source {
+    color: #444;
+  }
+
+  .printable__card,
+  .printable__question {
+    break-inside: avoid;
+    margin-bottom: 10pt;
+  }
+
+  .printable__front {
+    font-weight: 700;
+    margin: 0;
+  }
+
+  .printable__back,
+  .printable__source {
+    margin: 2pt 0 0;
+  }
+
+  .printable__source {
+    font-style: italic;
+    font-size: 9pt;
+  }
+
+  .printable__answers-title {
+    break-before: page;
+  }
+}

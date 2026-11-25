@@ -7,7 +7,7 @@
  * set", and no chance of the two drifting apart.
  */
 
-import { callGroq, callGroqStream, hasApiKey, primaryModel, UpstreamError } from './groq.js';
+import { callGroq, callGroqStream, hasApiKey, primaryModel, UpstreamError, withModelFallback } from './groq.js';
 import { buildExplainMessages, buildGenerateMessages, buildRefineMessages, buildRepairMessages } from './prompt.js';
 import { createRateLimiter, secondsUntil } from './rateLimit.js';
 import { reconcileIds } from './shared/ids.js';
@@ -186,7 +186,7 @@ export function buildExplainRequest(body) {
 
 /** @returns {Promise<{explanation: string, meta: {model: string}}>} */
 export async function generateExplanation({ messages, signal }) {
-  const completion = await callGroq({ messages, signal, temperature: 0.2, maxTokens: 600 });
+  const completion = await withModelFallback((model) => callGroq({ messages, signal, model, temperature: 0.2, maxTokens: 600 }));
   const extracted = extractJson(completion.content);
   const raw = extracted.ok ? (extracted.value?.explanation ?? extracted.value?.text) : null;
   const explanation = typeof raw === 'string' ? raw.replace(/\s+/g, ' ').trim().slice(0, MAX_EXPLANATION_CHARS) : '';
@@ -196,7 +196,10 @@ export async function generateExplanation({ messages, signal }) {
       retryable: true,
     });
   }
-  return { explanation, meta: { model: completion.model ?? defaultModel() } };
+  return {
+    explanation,
+    meta: { model: completion.model ?? defaultModel(), ...(completion.fallback && { fallback: completion.fallback }) },
+  };
 }
 
 /** Rate limit, validate, explain. Explanations have their own rate-limit bucket. */
@@ -229,14 +232,17 @@ export async function generateStudySet({ messages, topic, previous, notes, signa
   let attemptMessages = messages;
   let lastProblem = 'Unknown parsing failure.';
   const repairs = [];
+  // Set when the primary model was rate-limited or down and the backup answered.
+  let fallback = null;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     // Only the first attempt streams. A repair attempt follows a failure the
     // user has already waited through; it should just arrive whole.
     const completion =
       onPartial && attempt === 1
-        ? await streamAttempt({ messages: attemptMessages, signal, topic, onPartial })
-        : await callGroq({ messages: attemptMessages, signal });
+        ? await withModelFallback((model) => streamAttempt({ messages: attemptMessages, signal, topic, onPartial, model }))
+        : await withModelFallback((model) => callGroq({ messages: attemptMessages, signal, model }));
+    if (completion.fallback) fallback = completion.fallback;
     const truncated = completion.finishReason === 'length';
 
     const extracted = extractJson(completion.content);
@@ -261,6 +267,7 @@ export async function generateStudySet({ messages, topic, previous, notes, signa
             attempts: attempt,
             recovery: extracted.strategy,
             model: completion.model ?? defaultModel(),
+            ...(fallback && { fallback }),
             durationMs: Date.now() - startedAt,
             ...(grounding && { grounding }),
           },
@@ -308,7 +315,7 @@ const STREAM_FALLBACK_CODES = new Set(['stream_failed', 'bad_envelope', 'upstrea
  * off), the same request is made again without streaming. Cancellation,
  * timeouts and rate limits are not retried.
  */
-async function streamAttempt({ messages, signal, topic, onPartial }) {
+async function streamAttempt({ messages, signal, topic, onPartial, model }) {
   let scanned = 0;
   let braces = 0;
   let parsedAtBraces = 0;
@@ -333,11 +340,11 @@ async function streamAttempt({ messages, signal, topic, onPartial }) {
   };
 
   try {
-    return await callGroqStream({ messages, signal, onText });
+    return await callGroqStream({ messages, signal, onText, model });
   } catch (error) {
     if (!(error instanceof UpstreamError) || !STREAM_FALLBACK_CODES.has(error.code)) throw error;
     console.warn(`[stream] ${error.code}: falling back to a non-streamed request`);
-    return callGroq({ messages, signal });
+    return callGroq({ messages, signal, model });
   }
 }
 

@@ -189,6 +189,46 @@ export function primaryModel() {
 }
 
 /**
+ * The model to retry with when the primary is rate-limited or down. Groq's
+ * rate limits are per model, so a second model usually has headroom when the
+ * first has none. Set GROQ_FALLBACK_MODEL=none to turn this off.
+ */
+const DEFAULT_FALLBACK_MODEL = 'qwen/qwen3.8-27b';
+
+export function fallbackModel() {
+  const value = (process.env.GROQ_FALLBACK_MODEL ?? DEFAULT_FALLBACK_MODEL).trim();
+  return !value || value.toLowerCase() === 'none' ? null : value;
+}
+
+/** Failures that say "this model, right now" rather than "this request". */
+const FALLBACK_CODES = new Set(['rate_limited', 'provider_down']);
+
+/**
+ * Runs `call(model)` with the primary model, and once more with the fallback
+ * if the primary was rate-limited or the provider returned a 5xx. Bad input,
+ * a bad key, timeouts and cancellation are not retried — another model
+ * wouldn't change them.
+ *
+ * @template {object} T
+ * @param {(model: string) => Promise<T>} call
+ * @returns {Promise<T & {fallback?: {from: string, to: string, reason: string}}>}
+ */
+export async function withModelFallback(call) {
+  const primary = primaryModel();
+  try {
+    return await call(primary);
+  } catch (error) {
+    const backup = fallbackModel();
+    if (!(error instanceof UpstreamError) || !FALLBACK_CODES.has(error.code) || !backup || backup === primary) {
+      throw error;
+    }
+    console.warn(`[groq] ${primary} ${error.code}; retrying once with ${backup}`);
+    const result = await call(backup);
+    return { ...result, fallback: { from: primary, to: backup, reason: error.code } };
+  }
+}
+
+/**
  * POSTs a chat-completions request and returns the response if it's a 2xx.
  * Every failure becomes an UpstreamError the UI knows how to describe.
  */

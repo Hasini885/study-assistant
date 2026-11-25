@@ -3193,3 +3193,9 @@ kbd {
   font-size: 0.75rem;
   color: var(--muted);
 }
+
+.model-note {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}

@@ -164,7 +164,13 @@ test('a stream that breaks off falls back to an ordinary request', async (t) => 
   assert.equal(result.studySet.flashcards.length, 2);
 });
 
-test('a rate limit while streaming is not retried', async (t) => {
+test('a rate limit while streaming is not retried as a plain request', async (t) => {
+  // It may be retried on the fallback model (see fallback.test.js), never by
+  // dropping to a non-streamed call on the same model.
+  const saved = process.env.GROQ_FALLBACK_MODEL;
+  process.env.GROQ_FALLBACK_MODEL = 'none';
+  t.after(() => (saved === undefined ? delete process.env.GROQ_FALLBACK_MODEL : (process.env.GROQ_FALLBACK_MODEL = saved)));
+
   let calls = 0;
   t.mock.method(globalThis, 'fetch', async () => {
     calls++;

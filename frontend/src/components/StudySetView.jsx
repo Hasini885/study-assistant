@@ -88,6 +88,12 @@ export function StudySetView({
           <h2 className="workspace__title">{studySet.title}</h2>
           {studySet.summary && <p className="workspace__summary">{studySet.summary}</p>}
           <GroundingSummary grounding={meta?.grounding} />
+          {meta?.fallback && (
+            <p className="model-note">
+              Made by the backup model ({meta.fallback.to}) because {meta.fallback.from} was{' '}
+              {meta.fallback.reason === 'rate_limited' ? 'rate-limited' : 'unavailable'}.
+            </p>
+          )}
         </div>
         <div className="workspace__actions">
           <SetActions studySet={studySet} />

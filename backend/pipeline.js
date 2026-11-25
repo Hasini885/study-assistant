@@ -10,7 +10,7 @@
 import { callGroq, hasApiKey, UpstreamError } from './groq.js';
 import { buildGenerateMessages, buildRefineMessages, buildRepairMessages } from './prompt.js';
 import { extractJson } from './shared/extractJson.js';
-import { normalizeStudySet, isValidStudySet } from './shared/normalize.js';
+import { normalizeStudySet, isValidStudySet, studySetLimitViolation } from './shared/normalize.js';
 
 const MAX_INPUT_CHARS = 20_000;
 const MAX_ATTEMPTS = 2; // one initial call, one self-repair
@@ -52,6 +52,15 @@ export function buildRefineRequest(body) {
   // localStorage and could be anything.
   if (!isValidStudySet(studySet)) {
     throw new UpstreamError('bad_request', 'That study set can no longer be refined. Generate a new one.', {
+      status: 400,
+    });
+  }
+
+  // A real set always fits — the normalizer produced it. One that doesn't was
+  // built by hand to make us send the model a huge prompt.
+  const violation = studySetLimitViolation(studySet);
+  if (violation) {
+    throw new UpstreamError('bad_request', `That study set can't be refined — it has ${violation}.`, {
       status: 400,
     });
   }

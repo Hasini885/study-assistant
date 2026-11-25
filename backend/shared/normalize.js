@@ -352,6 +352,65 @@ function makeId(prefix, index) {
 }
 
 /**
+ * Checks a study set that arrived from outside — the browser, which may have
+ * read it back from localStorage — against LIMITS.
+ *
+ * normalizeStudySet *enforces* the same limits on model output by truncating,
+ * because there the model made a mistake and salvaging is right. Here it's the
+ * opposite: every normalized set already fits, so one that doesn't was built by
+ * hand, and repairing it would mean spending model quota on a payload we never
+ * produced. So this reports instead of repairing.
+ *
+ * @returns {string | null} what is wrong, phrased to follow "it has…", or null when the set is fine
+ */
+export function studySetLimitViolation(value) {
+  if (!isValidStudySet(value)) return 'an invalid shape';
+
+  const { flashcards, quiz } = value;
+  if (flashcards.length > LIMITS.maxFlashcards) {
+    return `${flashcards.length} flashcards (the limit is ${LIMITS.maxFlashcards})`;
+  }
+  if (quiz.length > LIMITS.maxQuizQuestions) {
+    return `${quiz.length} quiz questions (the limit is ${LIMITS.maxQuizQuestions})`;
+  }
+
+  const fieldProblem =
+    textProblem(value.title, 'the title', LIMITS.title, { optional: true }) ||
+    textProblem(value.summary, 'the summary', LIMITS.summary, { optional: true });
+  if (fieldProblem) return fieldProblem;
+
+  for (const [i, card] of flashcards.entries()) {
+    const where = `flashcard ${i + 1}`;
+    const problem =
+      textProblem(card.front, `${where}'s front`, LIMITS.text) ||
+      textProblem(card.back, `${where}'s back`, LIMITS.text) ||
+      textProblem(card.hint, `${where}'s hint`, LIMITS.text, { optional: true });
+    if (problem) return problem;
+  }
+
+  for (const [i, q] of quiz.entries()) {
+    const where = `question ${i + 1}`;
+    if (q.options.length > LIMITS.maxOptions) {
+      return `${q.options.length} options in ${where} (the limit is ${LIMITS.maxOptions})`;
+    }
+    const problem =
+      textProblem(q.question, where, LIMITS.text) ||
+      textProblem(q.explanation, `${where}'s explanation`, LIMITS.text, { optional: true }) ||
+      q.options.reduce((found, option, n) => found || textProblem(option, `option ${n + 1} of ${where}`, LIMITS.option), null);
+    if (problem) return problem;
+  }
+
+  return null;
+}
+
+function textProblem(value, label, max, { optional = false } = {}) {
+  if (value === undefined || value === null) return optional ? null : `no text for ${label}`;
+  if (typeof value !== 'string') return `a non-text value for ${label}`;
+  if (value.length > max) return `${value.length.toLocaleString('en-US')} characters in ${label} (the limit is ${max})`;
+  return null;
+}
+
+/**
  * Cheap client-side guard. The server already normalizes, but the client
  * shouldn't trust that a response on the wire matches what it expects.
  */

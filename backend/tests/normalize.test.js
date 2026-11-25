@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { extractJson } from '../shared/extractJson.js';
-import { normalizeStudySet, isValidStudySet } from '../shared/normalize.js';
+import { normalizeStudySet, isValidStudySet, studySetLimitViolation, LIMITS } from '../shared/normalize.js';
 
 const goodCard = { front: 'What is ATP?', back: 'The energy currency of the cell.' };
 const goodQuestion = {
@@ -207,4 +207,80 @@ test('isValidStudySet rejects an out-of-range answer index', () => {
 test('isValidStudySet rejects missing arrays', () => {
   assert.equal(isValidStudySet({ flashcards: [] }), false);
   assert.equal(isValidStudySet(null), false);
+});
+
+/* ------------------------------ input limits ----------------------------- */
+
+function validSet(overrides = {}) {
+  return {
+    title: 'Cell biology',
+    summary: 'Basics.',
+    flashcards: [{ id: 'c1', front: 'What is ATP?', back: 'Energy currency.', hint: '' }],
+    quiz: [{ id: 'q1', ...goodQuestion }],
+    ...overrides,
+  };
+}
+
+test('studySetLimitViolation accepts a normally sized set', () => {
+  assert.equal(studySetLimitViolation(validSet()), null);
+});
+
+test('studySetLimitViolation accepts anything the normalizer produced, even at the limits', () => {
+  const result = normalizeStudySet({
+    title: 't'.repeat(1000),
+    summary: 's'.repeat(1000),
+    flashcards: Array.from({ length: 60 }, (_, i) => ({ front: `${i} ${'f'.repeat(900)}`, back: 'b'.repeat(900), hint: 'h'.repeat(900) })),
+    quiz: Array.from({ length: 40 }, (_, i) => ({
+      question: `${i} ${'q'.repeat(900)}`,
+      options: Array.from({ length: 9 }, (__, n) => `${n} ${'o'.repeat(900)}`),
+      answerIndex: 0,
+      explanation: 'e'.repeat(900),
+    })),
+  });
+  assert.equal(result.ok, true);
+  assert.equal(studySetLimitViolation(result.data), null);
+});
+
+test('studySetLimitViolation rejects too many flashcards', () => {
+  const flashcards = Array.from({ length: LIMITS.maxFlashcards + 1 }, (_, i) => ({ front: `f${i}`, back: 'b' }));
+  assert.match(studySetLimitViolation(validSet({ flashcards })), /41 flashcards \(the limit is 40\)/);
+});
+
+test('studySetLimitViolation rejects too many quiz questions', () => {
+  const quiz = Array.from({ length: LIMITS.maxQuizQuestions + 1 }, () => goodQuestion);
+  assert.match(studySetLimitViolation(validSet({ quiz })), /31 quiz questions/);
+});
+
+test('studySetLimitViolation rejects too many options', () => {
+  const quiz = [{ ...goodQuestion, options: ['a', 'b', 'c', 'd', 'e', 'f', 'g'] }];
+  assert.match(studySetLimitViolation(validSet({ quiz })), /7 options in question 1/);
+});
+
+test('studySetLimitViolation rejects over-long strings in every field', () => {
+  const long = 'x'.repeat(5000);
+  const cases = [
+    [{ title: long }, /the title/],
+    [{ summary: long }, /the summary/],
+    [{ flashcards: [{ front: long, back: 'b' }] }, /flashcard 1's front/],
+    [{ flashcards: [{ front: 'f', back: long }] }, /flashcard 1's back/],
+    [{ flashcards: [{ front: 'f', back: 'b', hint: long }] }, /flashcard 1's hint/],
+    [{ quiz: [{ ...goodQuestion, question: long }] }, /in question 1/],
+    [{ quiz: [{ ...goodQuestion, explanation: long }] }, /question 1's explanation/],
+    [{ quiz: [{ ...goodQuestion, options: ['a', long] }] }, /option 2 of question 1/],
+  ];
+  for (const [overrides, pattern] of cases) {
+    assert.match(studySetLimitViolation(validSet(overrides)), pattern);
+  }
+});
+
+test('studySetLimitViolation rejects non-text values that would crash the UI', () => {
+  assert.match(
+    studySetLimitViolation(validSet({ quiz: [{ ...goodQuestion, options: ['a', { evil: true }] }] })),
+    /non-text value for option 2/
+  );
+  assert.match(studySetLimitViolation(validSet({ title: 42 })), /non-text value for the title/);
+});
+
+test('studySetLimitViolation reports an invalid shape', () => {
+  assert.equal(studySetLimitViolation({ flashcards: 'nope' }), 'an invalid shape');
 });

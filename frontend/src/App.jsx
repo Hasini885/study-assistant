@@ -14,7 +14,7 @@ import { StudySetView } from './components/StudySetView.jsx';
 import { ProgressPanel } from './components/ProgressPanel.jsx';
 import { SessionList } from './components/SessionList.jsx';
 import { EmptyState, ErrorBanner, ErrorState, HeroArt, LoadingState } from './components/States.jsx';
-import { FullscreenToggle, ThemeToggle } from './components/DevTools.jsx';
+import { FullscreenToggle, ThemeToggle } from './components/TopbarControls.jsx';
 
 const NO_CARDS = []; // stable identity so progress memos don't churn
 

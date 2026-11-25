@@ -1,3 +1,5 @@
+/** The icon buttons on the right of the topbar: fullscreen and theme. */
+
 export function FullscreenToggle({ isFullscreen, onToggle, supported }) {
   if (!supported) return null;
 

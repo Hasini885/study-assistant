@@ -11,6 +11,7 @@ import { callGroq, hasApiKey, UpstreamError } from './groq.js';
 import { buildGenerateMessages, buildRefineMessages, buildRepairMessages } from './prompt.js';
 import { createRateLimiter, secondsUntil } from './rateLimit.js';
 import { reconcileIds } from './shared/ids.js';
+import { carryGrounding, looksLikeNotes, verifyGrounding } from './shared/grounding.js';
 import { extractJson } from './shared/extractJson.js';
 import { normalizeStudySet, isValidStudySet, studySetLimitViolation } from './shared/normalize.js';
 
@@ -66,8 +67,7 @@ export async function handleStudySetRequest({
   generate = generateStudySet,
 }) {
   await enforceRateLimit(ip, limiter);
-  const { messages, topic, previous } = build(body);
-  return generate({ messages, topic, previous, signal });
+  return generate({ ...build(body), signal });
 }
 
 /**
@@ -95,7 +95,10 @@ export function buildGenerateRequest(body) {
   const { input } = body ?? {};
   assertUsableText(input);
 
-  return { messages: buildGenerateMessages({ input: input.trim() }), topic: input.trim() };
+  const text = input.trim();
+  // Notes (rather than a topic) get source quotes, checked against the notes.
+  const notes = looksLikeNotes(text) ? text : null;
+  return { messages: buildGenerateMessages({ input: text, withSources: Boolean(notes) }), topic: text, notes };
 }
 
 /** @throws {UpstreamError} when the instruction or the set is unusable. */
@@ -142,10 +145,11 @@ export function buildRefineRequest(body) {
  * @param {Array} args.messages
  * @param {string} args.topic
  * @param {object} [args.previous] the set being refined, whose ids carry over
+ * @param {string | null} [args.notes] the user's notes, to verify source quotes against
  * @param {AbortSignal} [args.signal]
  * @returns {Promise<{studySet: object, meta: object}>}
  */
-export async function generateStudySet({ messages, topic, previous, signal }) {
+export async function generateStudySet({ messages, topic, previous, notes, signal }) {
   const startedAt = Date.now();
   let attemptMessages = messages;
   let lastProblem = 'Unknown parsing failure.';
@@ -168,7 +172,7 @@ export async function generateStudySet({ messages, topic, previous, signal }) {
         }
         if (truncated) repairs.push('The response was cut short, so the set may be shorter than requested.');
 
-        const studySet = previous ? reconcileIds(previous, normalized.data).studySet : normalized.data;
+        const { studySet, grounding } = finishStudySet(normalized.data, { previous, notes });
 
         return {
           studySet,
@@ -178,6 +182,7 @@ export async function generateStudySet({ messages, topic, previous, signal }) {
             recovery: extracted.strategy,
             model: defaultModel(),
             durationMs: Date.now() - startedAt,
+            ...(grounding && { grounding }),
           },
         };
       }
@@ -209,6 +214,24 @@ export async function generateStudySet({ messages, topic, previous, signal }) {
     `The model returned something we could not use (${lastProblem}). Retrying often fixes this.`,
     { status: 502, retryable: true }
   );
+}
+
+/**
+ * The steps after a set validates: carry ids over from the set being refined,
+ * then either check every source quote against the notes, or — on a refine,
+ * where there are no notes — carry over the verdicts of unchanged items.
+ *
+ * @returns {{studySet: object, grounding: {checked: number, verified: number} | null}}
+ */
+export function finishStudySet(data, { previous, notes } = {}) {
+  let studySet = previous ? reconcileIds(previous, data).studySet : data;
+
+  if (notes) {
+    const { studySet: checked, checked: count, verified } = verifyGrounding(studySet, notes);
+    return { studySet: checked, grounding: { checked: count, verified } };
+  }
+  if (previous) studySet = carryGrounding(previous, studySet);
+  return { studySet, grounding: null };
 }
 
 /* -------------------------------------------------------------------------- */

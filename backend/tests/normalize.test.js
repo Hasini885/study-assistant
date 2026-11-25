@@ -318,3 +318,49 @@ test('malformed or duplicate ids from the model are replaced', () => {
   assert.equal(ids[2], 'dup-2');
   assert.match(result.data.quiz[0].id, /^q-/);
 });
+
+/* -------------------------------- sources -------------------------------- */
+
+test('a source quote from the model is kept, under any of its aliases', () => {
+  const result = normalizeStudySet({
+    flashcards: [{ ...goodCard, source: '  ATP is the  energy currency ' }, { front: 'B', back: 'b', quote: 'from notes' }],
+    quiz: [{ ...goodQuestion, evidence: 'It happens in the stroma.' }],
+  });
+  assert.equal(result.data.flashcards[0].source, 'ATP is the energy currency');
+  assert.equal(result.data.flashcards[1].source, 'from notes');
+  assert.equal(result.data.quiz[0].source, 'It happens in the stroma.');
+});
+
+test('items without a source have no source field at all', () => {
+  const result = normalizeStudySet({ flashcards: [goodCard], quiz: [goodQuestion] });
+  assert.equal('source' in result.data.flashcards[0], false);
+  assert.equal('source' in result.data.quiz[0], false);
+});
+
+test('a grounded flag from the model is ignored: only the server sets it', () => {
+  const result = normalizeStudySet({ flashcards: [{ ...goodCard, source: 'x', grounded: true }] });
+  assert.equal('grounded' in result.data.flashcards[0], false);
+});
+
+test('over-long sources are truncated, and non-text ones dropped', () => {
+  const result = normalizeStudySet({
+    flashcards: [{ ...goodCard, source: 's'.repeat(2000) }, { front: 'B', back: 'b', source: { nope: 1 } }],
+  });
+  assert.ok(result.data.flashcards[0].source.length <= LIMITS.source);
+  assert.equal('source' in result.data.flashcards[1], false);
+});
+
+test('studySetLimitViolation checks sources and grounded flags', () => {
+  assert.match(
+    studySetLimitViolation(validSet({ flashcards: [{ front: 'f', back: 'b', source: 's'.repeat(301) }] })),
+    /flashcard 1's source/
+  );
+  assert.match(
+    studySetLimitViolation(validSet({ quiz: [{ ...goodQuestion, grounded: 'yes' }] })),
+    /non-boolean value for question 1's grounded flag/
+  );
+  assert.equal(
+    studySetLimitViolation(validSet({ flashcards: [{ front: 'f', back: 'b', source: 'quote', grounded: true }] })),
+    null
+  );
+});

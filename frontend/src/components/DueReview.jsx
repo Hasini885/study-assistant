@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { GRADES, formatInterval, previewIntervals } from '@contract/srs.js';
+import { SourceBadge } from './SourceBadge.jsx';
 
 const LABELS = { again: 'Again', hard: 'Hard', good: 'Good', easy: 'Easy' };
 const KEYS = { a: 'again', h: 'hard', g: 'good', e: 'easy' };
@@ -120,6 +121,7 @@ export function DueReview({ sessions, initialQueue, onGrade, onExit }) {
               <span className="card__face card__face--back">
                 <span className="card__tag">Answer</span>
                 <span className="card__text">{current.card.back}</span>
+                <SourceBadge item={current.card} />
               </span>
             </span>
           </button>

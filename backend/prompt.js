@@ -49,12 +49,20 @@ Content rules:
 const CARD_COUNT = 8;
 const QUESTION_COUNT = 5;
 
-export function buildGenerateMessages({ input }) {
+/**
+ * In notes mode every item also carries a `source` quote, which the server
+ * then looks for in the notes (shared/grounding.js). Asking for it costs a few
+ * tokens per item and makes invented content visible instead of silent.
+ */
+const SOURCE_RULE = `Because these are the student's own notes, give every flashcard and every quiz question a "source" field: a short quote (one sentence or less, under 25 words) copied WORD FOR WORD from the notes that supports it. Do not paraphrase the quote, do not fix its spelling, and do not quote anything that is not in the notes.`;
+
+export function buildGenerateMessages({ input, withSources = false }) {
+  const task = `Create ${CARD_COUNT} flashcards and ${QUESTION_COUNT} multiple-choice questions from the following.`;
   return [
     { role: 'system', content: SYSTEM_PROMPT },
     {
       role: 'user',
-      content: `Create ${CARD_COUNT} flashcards and ${QUESTION_COUNT} multiple-choice questions from the following.\n\n---\n${input}\n---`,
+      content: `${task}${withSources ? `\n\n${SOURCE_RULE}` : ''}\n\n---\n${input}\n---`,
     },
   ];
 }
@@ -71,13 +79,14 @@ export function buildRefineMessages({ studySet, instruction }) {
     {
       title: studySet.title,
       summary: studySet.summary,
-      flashcards: studySet.flashcards.map(({ id, front, back, hint }) => ({ id, front, back, hint })),
-      quiz: studySet.quiz.map(({ id, question, options, answerIndex, explanation }) => ({
+      flashcards: studySet.flashcards.map(({ id, front, back, hint, source }) => ({ id, front, back, hint, source })),
+      quiz: studySet.quiz.map(({ id, question, options, answerIndex, explanation, source }) => ({
         id,
         question,
         options,
         answerIndex,
         explanation,
+        source,
       })),
     },
     null,
@@ -88,7 +97,7 @@ export function buildRefineMessages({ studySet, instruction }) {
     { role: 'system', content: SYSTEM_PROMPT },
     {
       role: 'user',
-      content: `Here is an existing study set:\n\n${current}\n\nApply this change: "${instruction}"\n\nReturn the COMPLETE updated study set in the same JSON shape. Keep every item the instruction does not touch exactly as it is. Do not drop items unless asked to.\n\nEvery existing item has an "id". Copy it unchanged onto that item in your output, even if you edit the item's text. Items you add have no "id". Never reuse an id on a different item.`,
+      content: `Here is an existing study set:\n\n${current}\n\nApply this change: "${instruction}"\n\nReturn the COMPLETE updated study set in the same JSON shape. Keep every item the instruction does not touch exactly as it is. Do not drop items unless asked to.\n\nEvery existing item has an "id". Copy it unchanged onto that item in your output, even if you edit the item's text. Items you add have no "id". Never reuse an id on a different item. If an item has a "source", keep it exactly as it is; items you add have no source.`,
     },
   ];
 }

@@ -3,6 +3,7 @@ import { Flashcards } from './Flashcards.jsx';
 import { CardGrid } from './CardGrid.jsx';
 import { Quiz } from './Quiz.jsx';
 import { RepairNotice } from './States.jsx';
+import { GroundingSummary } from './SourceBadge.jsx';
 import { hashString } from '@contract/ids.js';
 
 const REFINE_EXAMPLES = ['Make the questions harder', 'Add 3 cards about definitions', 'Simplify the wording'];
@@ -74,6 +75,7 @@ export function StudySetView({
         <div className="workspace__heading">
           <h2 className="workspace__title">{studySet.title}</h2>
           {studySet.summary && <p className="workspace__summary">{studySet.summary}</p>}
+          <GroundingSummary grounding={meta?.grounding} />
         </div>
         <button type="button" className="btn btn--small" onClick={onSave} disabled={saveState === 'saved'}>
           {saveState === 'saved' ? 'Saved ✓' : 'Save session'}

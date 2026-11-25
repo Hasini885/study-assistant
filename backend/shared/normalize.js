@@ -14,6 +14,9 @@
  *   summary: string,
  *   flashcards: [{ id, front, back, hint }],   ids are stable: see ids.js
  *   quiz: [{ id, question, options: string[], answerIndex: number, explanation }]
+ *
+ * Either kind of item may also carry `source` (a quote from the user's notes,
+ * see grounding.js) and, once the server has checked that quote, `grounded`.
  * }
  */
 
@@ -24,6 +27,7 @@ export const LIMITS = {
   summary: 400,
   text: 600,
   option: 300,
+  source: 300,
   maxFlashcards: 40,
   maxQuizQuestions: 30,
   minOptions: 2,
@@ -112,6 +116,7 @@ function normalizeFlashcards(list, repairs) {
       front,
       back,
       hint: cleanString(isPlainObject(item) ? pick(item, ['hint', 'clue', 'tip']) : '', LIMITS.text),
+      ...sourceField(item),
     });
   }
 
@@ -183,6 +188,7 @@ function normalizeQuiz(list, repairs) {
       options,
       answerIndex,
       explanation: cleanString(pick(item, ['explanation', 'rationale', 'why', 'reason']), LIMITS.text),
+      ...sourceField(item),
     });
   }
 
@@ -323,6 +329,18 @@ function coerceToPair(item, frontKeys, backKeys) {
   return null;
 }
 
+/**
+ * The optional supporting quote. Only present when the model gave one, so sets
+ * made from a bare topic don't carry an empty field around. `grounded` is
+ * never read from the model — only the server's own check sets it.
+ */
+function sourceField(item) {
+  if (!isPlainObject(item)) return {};
+  const raw = pick(item, ['source', 'quote', 'evidence', 'citation']);
+  const source = cleanString(raw, LIMITS.source);
+  return source ? { source } : {};
+}
+
 function cleanString(value, max) {
   if (typeof value === 'number' || typeof value === 'boolean') value = String(value);
   if (typeof value !== 'string') return '';
@@ -392,7 +410,9 @@ export function studySetLimitViolation(value) {
     const problem =
       textProblem(card.front, `${where}'s front`, LIMITS.text) ||
       textProblem(card.back, `${where}'s back`, LIMITS.text) ||
-      textProblem(card.hint, `${where}'s hint`, LIMITS.text, { optional: true });
+      textProblem(card.hint, `${where}'s hint`, LIMITS.text, { optional: true }) ||
+      textProblem(card.source, `${where}'s source`, LIMITS.source, { optional: true }) ||
+      flagProblem(card.grounded, `${where}'s grounded flag`);
     if (problem) return problem;
   }
 
@@ -404,11 +424,17 @@ export function studySetLimitViolation(value) {
     const problem =
       textProblem(q.question, where, LIMITS.text) ||
       textProblem(q.explanation, `${where}'s explanation`, LIMITS.text, { optional: true }) ||
+      textProblem(q.source, `${where}'s source`, LIMITS.source, { optional: true }) ||
+      flagProblem(q.grounded, `${where}'s grounded flag`) ||
       q.options.reduce((found, option, n) => found || textProblem(option, `option ${n + 1} of ${where}`, LIMITS.option), null);
     if (problem) return problem;
   }
 
   return null;
+}
+
+function flagProblem(value, label) {
+  return value === undefined || typeof value === 'boolean' ? null : `a non-boolean value for ${label}`;
 }
 
 function textProblem(value, label, max, { optional = false } = {}) {

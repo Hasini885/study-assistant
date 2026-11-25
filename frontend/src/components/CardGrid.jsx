@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { SourceBadge } from './SourceBadge.jsx';
 
 const FILTERS = [
   { id: 'all', label: 'All' },
@@ -95,7 +96,10 @@ export function CardGrid({ cards, statuses, onMark, onStudyCard }) {
                   <span className="tile__index">{index + 1}</span>
                   <span className="tile__question">{card.front}</span>
                   {isFlipped ? (
-                    <span className="tile__answer">{card.back}</span>
+                    <span className="tile__answer">
+                      {card.back}
+                      <SourceBadge item={card} showQuote={false} />
+                    </span>
                   ) : (
                     <span className="tile__prompt">Show answer</span>
                   )}

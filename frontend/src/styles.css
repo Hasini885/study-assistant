@@ -2854,3 +2854,58 @@ kbd {
   text-underline-offset: 2px;
   cursor: pointer;
 }
+
+/* -------------------------------------------------------------- grounding -- */
+
+.source {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  margin-top: 10px;
+  font-family: var(--font);
+  text-align: left;
+}
+
+.source__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.source--ok .source__badge {
+  background: var(--correct-soft);
+  color: var(--correct);
+}
+
+/* Deliberately quieter than an error: this is "check me", not "I'm wrong". */
+.source--warn .source__badge {
+  background: transparent;
+  border: 1px dashed var(--border-strong);
+  color: var(--muted);
+}
+
+.source__quote {
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.tile__answer .source {
+  margin-top: 6px;
+}
+
+.grounding-summary {
+  margin: 6px 0 0;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.grounding-summary.is-ok {
+  color: var(--correct);
+}

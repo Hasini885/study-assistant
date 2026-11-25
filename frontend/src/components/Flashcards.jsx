@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { GRADES, formatInterval, previewIntervals } from '@contract/srs.js';
+import { SourceBadge } from './SourceBadge.jsx';
 
 const SWIPE_THRESHOLD = 70; // px of travel before a drag counts as a swipe
 
@@ -190,6 +191,7 @@ export function Flashcards({ cards, statuses, records = {}, onMark, onGrade, ind
                   <span className="card__face card__face--back">
                     <span className="card__tag">Answer</span>
                     <span className="card__text">{card.back}</span>
+                    <SourceBadge item={card} />
                   </span>
                 </span>
               </button>

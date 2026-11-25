@@ -236,3 +236,42 @@ test('refining sends ids to the model and keeps them on the result', async (t) =
   assert.ok(!['card-0-1', 'card-1-2'].includes(studySet.flashcards[2].id));
   assert.equal(studySet.quiz[0].id, 'q-0-3');
 });
+
+/* --------------------------------- grounding ------------------------------- */
+
+const NOTES =
+  'Photosynthesis happens in two stages. The light-dependent reactions take place in the thylakoid membranes ' +
+  'and produce ATP and NADPH. The Calvin cycle takes place in the stroma, where carbon dioxide is fixed into ' +
+  'sugar using the ATP and NADPH made earlier. Plants cannot run the light reactions at night.';
+
+test('notes get source quotes that are checked against the notes', async (t) => {
+  const calls = mockGroq(
+    t,
+    JSON.stringify({
+      title: 'Photosynthesis',
+      flashcards: [
+        { front: 'Where is the Calvin cycle?', back: 'The stroma', source: 'The Calvin cycle takes place in the stroma' },
+        { front: 'What absorbs light?', back: 'Chlorophyll', source: 'Chlorophyll absorbs red and blue light' },
+      ],
+      quiz: [{ ...question, source: 'produce ATP and NADPH' }],
+    })
+  );
+
+  const { studySet, meta } = await generateStudySet(buildGenerateRequest({ input: NOTES }));
+
+  assert.match(calls[0].messages[1].content, /"source" field/);
+  assert.deepEqual(
+    studySet.flashcards.map((c) => c.grounded),
+    [true, false]
+  );
+  assert.equal(studySet.quiz[0].grounded, true);
+  assert.deepEqual(meta.grounding, { checked: 3, verified: 2 });
+});
+
+test('a bare topic is not asked for sources and is not graded on them', async (t) => {
+  const calls = mockGroq(t, JSON.stringify({ title: 'Bio', flashcards: [{ front: 'a?', back: 'b' }], quiz: [] }));
+  const { studySet, meta } = await generateStudySet(buildGenerateRequest({ input: 'Photosynthesis' }));
+  assert.doesNotMatch(calls[0].messages[1].content, /"source"/);
+  assert.equal('grounded' in studySet.flashcards[0], false);
+  assert.equal(meta.grounding, undefined);
+});

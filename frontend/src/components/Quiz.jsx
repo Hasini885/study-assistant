@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useReducer } from 'react';
 import { Confetti } from './Confetti.jsx';
+import { SourceBadge } from './SourceBadge.jsx';
 import { useAnimatedNumber } from '../hooks/useAnimatedNumber.js';
 
 /**
@@ -214,6 +215,7 @@ export function Quiz({ questions, onRoundComplete }) {
             </p>
           )}
           {question.explanation && <p className="feedback__explanation">{question.explanation}</p>}
+          <SourceBadge item={question} />
         </div>
       )}
 
@@ -295,6 +297,7 @@ function QuizResults({ results, round, correctCount, wrongCount, bestStreak, onR
               Answer: <span className="is-correct-text">{question.options[question.answerIndex]}</span>
             </p>
             {question.explanation && <p className="review-item__explanation">{question.explanation}</p>}
+            <SourceBadge item={question} showQuote={false} />
           </li>
         ))}
       </ol>

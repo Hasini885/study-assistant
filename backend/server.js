@@ -6,7 +6,7 @@
  * validated study set.
  *
  * In production on Vercel these same routes are served by the serverless
- * functions in `api/`. Both call straight into `server/pipeline.js`, so this
+ * functions in `api/`. Both call straight into `backend/pipeline.js`, so this
  * file is only transport — no logic lives here.
  */
 
@@ -65,7 +65,7 @@ async function run(req, res, build) {
   }
 }
 
-// Lets `NODE_ENV=production node server/index.js` serve the built client too,
+// Lets `NODE_ENV=production node backend/server.js` serve the built client too,
 // for anywhere that isn't Vercel.
 if (process.env.NODE_ENV === 'production') {
   const dist = path.join(__dirname, '..', 'dist');

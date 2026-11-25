@@ -43,7 +43,7 @@ validate against the same definition rather than two copies that can drift.
 
 ## Setup
 
-Requires Node 18+ (developed on Node 22).
+Requires Node 20+ (developed on Node 22).
 
 ```bash
 npm install
@@ -67,12 +67,12 @@ This runs both processes: the Express API on `http://localhost:8787` and the Vit
 **`http://localhost:5173`** — open that one.
 
 ```bash
-npm test      # 36 tests covering JSON extraction and shape repair
+npm test      # 78 tests: JSON extraction, shape repair, input limits, rate limiting
 npm run build # production build
 ```
 
-The app runs without a key — the failure-handling demo below works offline — but real generation
-needs one.
+Without a key the app still loads — saved sessions open, and the UI shows a "No API key
+configured" banner — but generating a set needs one.
 
 ### Why there's a backend
 
@@ -264,7 +264,7 @@ render-time crash so the worst case is still not a blank page.
 
 ### 7. Where this is proven
 
-`npm test` runs 36 tests over exactly these paths — every recovery strategy and every repair
+`npm test` covers exactly these paths — every recovery strategy and every repair
 rule, each one written against output a model actually produced:
 
 | Covered | Examples |
@@ -274,11 +274,6 @@ rule, each one written against output a model actually produced:
 | Answer keys | letters, `(b)`, option text, labelled option text, 1-based indices, `{text, correct}` objects |
 | Rejection | unanswerable questions, fewer than two distinct options, off-schema objects, deliberately empty sets |
 | End to end | a truncated response becoming a shorter but valid study set |
-
-During development these paths were also exercised through a failure-injection mode on the
-server that returned deliberately broken responses on demand. That has been removed now the
-behaviour is locked down by tests — it was a scaffold, not a feature, and shipping a switch that
-makes the app fail on purpose is not something a user should find.
 
 ---
 
@@ -520,8 +515,8 @@ I also used AI for CSS scaffolding. Every file here is one I can walk through an
   network is one bucket.
 - **20,000 character input cap**, and long notes can still hit the model's context limit — that
   returns a clear "input too long" error rather than failing mysteriously.
-- **Tests cover the parsing and repair layer only.** No component tests; the UI was verified by
-  hand and through the failure-injection modes.
+- **Tests cover the backend only** — parsing, repair, input limits and rate limiting. No
+  component tests; the UI was verified by hand.
 
 ## What I'd do next
 

@@ -1,7 +1,7 @@
 /**
  * The request pipeline, independent of how it is being served.
  *
- * Local development runs this behind Express (`server/index.js`); production on
+ * Local development runs this behind Express (`backend/server.js`); production on
  * Vercel runs it inside serverless functions (`api/*.js`). Both share this file
  * so there is exactly one implementation of "turn text into a validated study
  * set", and no chance of the two drifting apart.

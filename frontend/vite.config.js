@@ -24,6 +24,12 @@ export default defineConfig({
     },
   },
   plugins: [react()],
+  // Frontend unit and component tests. Backend tests run under `node --test`.
+  test: {
+    include: ['tests/**/*.test.{js,jsx}'],
+    environment: 'jsdom',
+    setupFiles: ['tests/setup.js'],
+  },
   server: {
     port: 5173,
     proxy: {

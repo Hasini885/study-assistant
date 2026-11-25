@@ -14,7 +14,9 @@
     "start:client": "vite --config frontend/vite.config.js",
     "build": "vite build --config frontend/vite.config.js",
     "preview": "vite preview --config frontend/vite.config.js",
-    "test": "node --test"
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "node --test \"backend/tests/**/*.test.js\"",
+    "test:frontend": "vitest run --config frontend/vite.config.js"
   },
   "dependencies": {
     "@upstash/ratelimit": "^2.2.2",
@@ -25,8 +27,13 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.3",
     "@vitejs/plugin-react": "^4.3.1",
     "concurrently": "^8.2.2",
-    "vite": "^5.4.2"
+    "jsdom": "^25.0.1",
+    "vite": "^5.4.2",
+    "vitest": "^2.1.9"
   }
 }

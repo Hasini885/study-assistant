@@ -14,11 +14,13 @@ const TOPICS = [
 
 const TICKER = [
   'FLASHCARDS',
-  'MULTIPLE CHOICE',
+  'SPACED REPETITION',
+  'PDF & WORD UPLOAD',
+  'CHECKED AGAINST YOUR NOTES',
+  'TRUE / FALSE · FILL THE BLANK',
   'RE-TEST WRONG ANSWERS',
-  'SPACED DRILLING',
-  'INSTANT FEEDBACK',
-  'SAVE & RESUME',
+  'EXPORT TO ANKI',
+  'SHARE BY LINK',
 ];
 
 const EXIT_MS = 420;
@@ -78,7 +80,7 @@ export function Landing({ onEnter, recentSession, onResume, dueCount = 0, onRevi
       </div>
 
       <div className="landing__inner">
-        <p className="landing__eyebrow">Flashcards · Quiz · Re-test</p>
+        <p className="landing__eyebrow">Flashcards · Quiz · Spaced repetition</p>
 
         <h1 className="landing__wordmark" aria-label="Study Assistant">
           <Word text="STUDY" offset={0} />

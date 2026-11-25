@@ -111,7 +111,9 @@ export function StudySetView({
             key={`cards-${cardsKey}`}
             cards={studySet.flashcards}
             statuses={progress.statuses}
+            records={progress.records}
             onMark={progress.setStatus}
+            onGrade={progress.grade}
             index={deckIndex}
             onIndex={setDeckIndex}
           />

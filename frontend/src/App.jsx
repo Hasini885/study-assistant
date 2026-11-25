@@ -7,32 +7,75 @@ import { useSessions } from './hooks/useSessions.js';
 import { useStudyProgress } from './hooks/useStudyProgress.js';
 import { useFullscreen } from './hooks/useFullscreen.js';
 import { useTheme } from './hooks/useTheme.js';
+import { useNow } from './hooks/useNow.js';
+import { collectDue, dueCountsBySession, gradeRecord } from './lib/sessionStore.js';
 
 import { Landing } from './components/Landing.jsx';
 import { PromptForm } from './components/PromptForm.jsx';
 import { StudySetView } from './components/StudySetView.jsx';
 import { ProgressPanel } from './components/ProgressPanel.jsx';
 import { SessionList } from './components/SessionList.jsx';
+import { DuePanel } from './components/DuePanel.jsx';
+import { DueReview } from './components/DueReview.jsx';
 import { EmptyState, ErrorBanner, ErrorState, HeroArt, LoadingState } from './components/States.jsx';
 import { FullscreenToggle, ThemeToggle } from './components/TopbarControls.jsx';
 
 const NO_CARDS = []; // stable identity so progress memos don't churn
+const NO_PROGRESS = {};
 
 export default function App() {
   const { theme, cycleTheme } = useTheme();
   const fullscreen = useFullscreen();
-  const { sessions, saveSession, deleteSession } = useSessions();
+  const { sessions, saveSession, updateProgress, deleteSession } = useSessions();
   const study = useStudySet();
-
-  const cards = useMemo(() => study.studySet?.flashcards ?? NO_CARDS, [study.studySet]);
-  const progress = useStudyProgress(cards);
+  const now = useNow();
 
   const [health, setHealth] = useState(null);
   const [activeSessionId, setActiveSessionId] = useState(null);
-  const [saveState, setSaveState] = useState('idle');
   const [quizStats, setQuizStats] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [entered, setEntered] = useState(false);
+  // 'study' is the normal workspace; 'due' is the cross-session review queue.
+  const [view, setView] = useState('study');
+  const [dueRun, setDueRun] = useState({ id: 0, queue: [] });
+  // Progress for a set that hasn't been saved yet. Once it is saved, the
+  // session owns its progress and every mark is persisted as it's made.
+  const [draftProgress, setDraftProgress] = useState(NO_PROGRESS);
+
+  const activeSession = useMemo(
+    () => (activeSessionId ? (sessions.find((s) => s.id === activeSessionId) ?? null) : null),
+    [sessions, activeSessionId]
+  );
+
+  const records = activeSession ? activeSession.progress : draftProgress;
+  const setRecords = useCallback(
+    (change) => {
+      if (activeSession) updateProgress(activeSession.id, change);
+      else setDraftProgress(change);
+    },
+    [activeSession, updateProgress]
+  );
+
+  const cards = useMemo(() => study.studySet?.flashcards ?? NO_CARDS, [study.studySet]);
+  const progress = useStudyProgress(cards, records, setRecords);
+
+  // Saved means the session on disk holds exactly the set on screen. Derived
+  // rather than tracked: a tracked flag set to "saved" on load was immediately
+  // reset by the effect that marks a changed set as unsaved.
+  const isSaved = useMemo(
+    () =>
+      Boolean(activeSession && study.studySet) &&
+      (activeSession.studySet === study.studySet ||
+        JSON.stringify(activeSession.studySet) === JSON.stringify(study.studySet)),
+    [activeSession, study.studySet]
+  );
+
+  const dueItems = useMemo(() => collectDue(sessions, now), [sessions, now]);
+  const dueBySession = useMemo(() => dueCountsBySession(sessions, now), [sessions, now]);
+  const hasSchedule = useMemo(
+    () => sessions.some((s) => Object.values(s.progress ?? {}).some((record) => record.srs)),
+    [sessions]
+  );
 
   // Kept so "Regenerate" can re-run the original prompt after a refinement.
   const lastInputRef = useRef('');
@@ -43,9 +86,8 @@ export default function App() {
     return () => controller.abort();
   }, []);
 
-  // A new or changed set is unsaved again, and its quiz history no longer applies.
+  // A new or changed set's quiz history no longer applies.
   useEffect(() => {
-    setSaveState('idle');
     setQuizStats(null);
   }, [study.studySet]);
 
@@ -68,6 +110,8 @@ export default function App() {
     ({ input }) => {
       lastInputRef.current = input;
       setActiveSessionId(null);
+      setDraftProgress(NO_PROGRESS);
+      setView('study');
       setSidebarOpen(false);
       study.generate({ input });
     },
@@ -88,18 +132,15 @@ export default function App() {
   }, [study]);
 
   const handleSave = useCallback(() => {
-    const id = saveSession(study.studySet, study.meta, activeSessionId);
-    if (id) {
-      setActiveSessionId(id);
-      setSaveState('saved');
-    }
-  }, [saveSession, study.studySet, study.meta, activeSessionId]);
+    const id = saveSession(study.studySet, study.meta, activeSessionId, records);
+    if (id) setActiveSessionId(id);
+  }, [saveSession, study.studySet, study.meta, activeSessionId, records]);
 
   const handleLoadSession = useCallback(
     (session) => {
       study.load(session.studySet, session.meta);
       setActiveSessionId(session.id);
-      setSaveState('saved');
+      setView('study');
       setSidebarOpen(false);
     },
     [study]
@@ -108,8 +149,35 @@ export default function App() {
   const handleReset = useCallback(() => {
     study.reset();
     setActiveSessionId(null);
+    setDraftProgress(NO_PROGRESS);
+    setView('study');
     lastInputRef.current = '';
   }, [study]);
+
+  const handleDeleteSession = useCallback(
+    (id) => {
+      // Deleting the open session keeps its progress for this visit, so the
+      // set on screen doesn't suddenly look unstudied.
+      if (id === activeSession?.id) {
+        setDraftProgress(activeSession.progress);
+        setActiveSessionId(null);
+      }
+      deleteSession(id);
+    },
+    [activeSession, deleteSession]
+  );
+
+  const startDueReview = useCallback(() => {
+    setDueRun((run) => ({ id: run.id + 1, queue: collectDue(sessions, Date.now()) }));
+    setView('due');
+    setSidebarOpen(false);
+  }, [sessions]);
+
+  const handleDueGrade = useCallback(
+    (sessionId, cardId, grade) =>
+      updateProgress(sessionId, (current) => ({ ...current, [cardId]: gradeRecord(current[cardId], grade, Date.now()) })),
+    [updateProgress]
+  );
 
   // A fatal error with nothing on screen takes over the workspace; a failure
   // that happened while a set is loaded is a dismissible banner instead, so the
@@ -124,6 +192,11 @@ export default function App() {
       <Landing
         onEnter={() => setEntered(true)}
         recentSession={sessions[0]}
+        dueCount={dueItems.length}
+        onReviewDue={() => {
+          startDueReview();
+          setEntered(true);
+        }}
         onResume={(session) => {
           handleLoadSession(session);
           setEntered(true);
@@ -181,15 +254,18 @@ export default function App() {
             </section>
           )}
 
-          {hasSet && (
+          {hasSet && view === 'study' && (
             <ProgressPanel counts={progress.counts} quizStats={quizStats} onResetProgress={progress.reset} />
           )}
+
+          <DuePanel count={dueItems.length} hasSchedule={hasSchedule} reviewing={view === 'due'} onStart={startDueReview} />
 
           <SessionList
             sessions={sessions}
             onLoad={handleLoadSession}
-            onDelete={deleteSession}
+            onDelete={handleDeleteSession}
             activeId={activeSessionId}
+            dueBySession={dueBySession}
           />
 
           {health?.model && (
@@ -212,7 +288,15 @@ export default function App() {
             </div>
           )}
 
-          {fatalError ? (
+          {view === 'due' ? (
+            <DueReview
+              key={dueRun.id}
+              sessions={sessions}
+              initialQueue={dueRun.queue}
+              onGrade={handleDueGrade}
+              onExit={() => setView('study')}
+            />
+          ) : fatalError ? (
             <ErrorState error={study.error} onRetry={study.retry} onReset={handleReset} />
           ) : (
             <>
@@ -247,7 +331,7 @@ export default function App() {
                   onRefine={handleRefine}
                   onRegenerate={lastInputRef.current ? handleRegenerate : null}
                   onSave={handleSave}
-                  saveState={saveState}
+                  saveState={isSaved ? 'saved' : 'idle'}
                   progress={progress}
                   onQuizRound={setQuizStats}
                 />

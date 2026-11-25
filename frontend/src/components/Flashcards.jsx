@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { GRADES, formatInterval, previewIntervals } from '@contract/srs.js';
 
 const SWIPE_THRESHOLD = 70; // px of travel before a drag counts as a swipe
+
+/** Spaced-repetition grades, with letter shortcuts that leave 1 / 2 and the arrows alone. */
+const GRADE_UI = {
+  again: { label: 'Again', key: 'a' },
+  hard: { label: 'Hard', key: 'h' },
+  good: { label: 'Good', key: 'g' },
+  easy: { label: 'Easy', key: 'e' },
+};
 
 /**
  * Flip-through flashcards.
@@ -12,7 +21,7 @@ const SWIPE_THRESHOLD = 70; // px of travel before a drag counts as a swipe
  * `index` always refers to a position in the full `cards` array; `visible` maps
  * the filtered/shuffled view back onto it.
  */
-export function Flashcards({ cards, statuses, onMark, index, onIndex }) {
+export function Flashcards({ cards, statuses, records = {}, onMark, onGrade, index, onIndex }) {
   const [order, setOrder] = useState(() => cards.map((_, i) => i));
   const [flipped, setFlipped] = useState(false);
   const [reviewOnly, setReviewOnly] = useState(false);
@@ -60,6 +69,17 @@ export function Flashcards({ cards, statuses, onMark, index, onIndex }) {
     [card, onMark, position, visible.length, go]
   );
 
+  /** Grade the revealed card for spaced repetition, then move on. */
+  const gradeCard = useCallback(
+    (grade) => {
+      if (!card || !flipped || !onGrade) return;
+      onGrade(card.id, grade);
+      if (position < visible.length - 1) go(1);
+      else setFlipped(false);
+    },
+    [card, flipped, onGrade, position, visible.length, go]
+  );
+
   const { dragX, dragging, handlers, wasDragged } = useSwipe({
     onSwipeLeft: () => go(1),
     onSwipeRight: () => go(-1),
@@ -72,6 +92,7 @@ export function Flashcards({ cards, statuses, onMark, index, onIndex }) {
     ArrowLeft: () => go(-1),
     1: () => mark('known'),
     2: () => mark('review'),
+    ...Object.fromEntries(GRADES.map((grade) => [GRADE_UI[grade].key, () => gradeCard(grade)])),
   });
 
   // If the filter empties the view, offer a way back rather than a blank panel.
@@ -197,6 +218,10 @@ export function Flashcards({ cards, statuses, onMark, index, onIndex }) {
             </button>
           </div>
 
+          {flipped && onGrade && (
+            <GradeBar srs={records[card.id]?.srs} onGrade={gradeCard} />
+          )}
+
           <div className="deck__marks">
             <button type="button" className={`btn btn--mark ${status === 'known' ? 'is-active' : ''}`} onClick={() => mark('known')}>
               Got it <kbd>1</kbd>
@@ -227,7 +252,9 @@ export function Flashcards({ cards, statuses, onMark, index, onIndex }) {
             })}
           </div>
 
-          <p className="deck__hint">Swipe or drag the card sideways · ← → to move · 1 / 2 to mark</p>
+          <p className="deck__hint">
+            Swipe or drag the card sideways · ← → to move · 1 / 2 to mark · reveal, then A / H / G / E to schedule
+          </p>
         </div>
 
         {/*
@@ -259,6 +286,34 @@ export function Flashcards({ cards, statuses, onMark, index, onIndex }) {
           </ol>
         </aside>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Again / Hard / Good / Easy, each labelled with when the card would come back.
+ * Shown only once the answer is revealed — grading a card you haven't checked
+ * would make the schedule meaningless.
+ */
+function GradeBar({ srs, onGrade }) {
+  const preview = useMemo(() => previewIntervals(srs, Date.now()), [srs]);
+
+  return (
+    <div className="grades" role="group" aria-label="How well did you know it? Schedules the next review.">
+      {GRADES.map((grade, i) => (
+        <button
+          key={grade}
+          type="button"
+          className={`grade grade--${grade}`}
+          onClick={() => onGrade(grade)}
+          style={{ '--i': i }}
+          aria-label={`${GRADE_UI[grade].label}: see it again in ${formatInterval(preview[grade])}`}
+        >
+          <span className="grade__label">{GRADE_UI[grade].label}</span>
+          <span className="grade__when">{formatInterval(preview[grade])}</span>
+          <kbd>{GRADE_UI[grade].key.toUpperCase()}</kbd>
+        </button>
+      ))}
     </div>
   );
 }
@@ -344,7 +399,7 @@ function useKeyboardShortcuts(handlers) {
       const tag = event.target?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || event.target?.isContentEditable) return;
 
-      const handler = ref.current[event.key];
+      const handler = ref.current[event.key] ?? ref.current[event.key.toLowerCase?.()];
       if (!handler) return;
       event.preventDefault();
       handler();

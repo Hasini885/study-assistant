@@ -30,7 +30,7 @@ const EXIT_MS = 420;
  * delay. That breaks the text up for assistive tech, so the heading carries an
  * aria-label and the letter spans are hidden from the a11y tree.
  */
-export function Landing({ onEnter, recentSession, onResume }) {
+export function Landing({ onEnter, recentSession, onResume, dueCount = 0, onReviewDue }) {
   const parallax = usePointerParallax();
   const [topic, setTopic] = useState(0);
   const [leaving, setLeaving] = useState(false);
@@ -105,6 +105,12 @@ export function Landing({ onEnter, recentSession, onResume }) {
           <button type="button" className="btn btn--primary btn--hero" onClick={start}>
             Start studying
           </button>
+
+          {dueCount > 0 && onReviewDue && (
+            <button type="button" className="btn btn--ghost landing__due" onClick={() => leave(onReviewDue)}>
+              Review {dueCount} due card{dueCount === 1 ? '' : 's'}
+            </button>
+          )}
 
           {recentSession && (
             <button type="button" className="btn btn--ghost" onClick={() => leave(() => onResume(recentSession))}>

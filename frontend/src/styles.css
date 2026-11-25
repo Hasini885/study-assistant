@@ -2669,3 +2669,151 @@ kbd {
     translate: none;
   }
 }
+
+/* ------------------------------------------------------ spaced repetition -- */
+
+/* Grade bar: shown once the answer is revealed. Each button says when the
+   card would come back, so the choice is about time, not judgement. */
+.grades {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.grade {
+  --tone: var(--accent);
+  --tone-soft: var(--accent-soft);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas:
+    'label key'
+    'when key';
+  align-items: center;
+  gap: 0 8px;
+  padding: 9px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    transform 0.15s ease;
+  animation: riseIn 0.26s ease backwards;
+  animation-delay: calc(var(--i, 0) * 45ms);
+}
+
+.grade:hover,
+.grade:focus-visible {
+  border-color: var(--tone);
+  background: var(--tone-soft);
+  transform: translateY(-1px);
+}
+
+.grade--again {
+  --tone: var(--wrong);
+  --tone-soft: var(--wrong-soft);
+}
+
+.grade--hard {
+  --tone: var(--warn);
+  --tone-soft: var(--warn-soft);
+}
+
+.grade--good {
+  --tone: var(--correct);
+  --tone-soft: var(--correct-soft);
+}
+
+.grade__label {
+  grid-area: label;
+  font-weight: 650;
+  color: var(--tone);
+}
+
+.grade__when {
+  grid-area: when;
+  font-size: 0.76rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.grade kbd {
+  grid-area: key;
+}
+
+.dot--due {
+  background: var(--accent);
+}
+
+.session__due {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.due-panel__row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.due-panel__count {
+  font-size: 1.9rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+.due-panel__label {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.due-panel__done {
+  color: var(--correct);
+}
+
+/* Due-today review: the deck's card, alone, with the grade bar under it. */
+.due {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 760px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.due__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.due__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+}
+
+.due__note {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+.due--done {
+  align-items: center;
+  text-align: center;
+  padding: 48px 0;
+}
+
+@media (max-width: 600px) {
+  .grades {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

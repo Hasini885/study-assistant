@@ -45,6 +45,11 @@ export function ProgressPanel({ counts, quizStats, onResetProgress }) {
         <li>
           <span className="dot dot--unseen" /> Untouched <strong>{counts.unseen}</strong>
         </li>
+        {counts.due > 0 && (
+          <li>
+            <span className="dot dot--due" /> Due today <strong>{counts.due}</strong>
+          </li>
+        )}
       </ul>
 
       {quizStats && (

@@ -1,5 +1,5 @@
 /** Previously saved study sets, restored from localStorage. */
-export function SessionList({ sessions, onLoad, onDelete, activeId }) {
+export function SessionList({ sessions, onLoad, onDelete, activeId, dueBySession = {} }) {
   if (sessions.length === 0) return null;
 
   return (
@@ -13,6 +13,9 @@ export function SessionList({ sessions, onLoad, onDelete, activeId }) {
               <span className="session__meta">
                 {session.counts.flashcards} cards · {session.counts.quiz} questions · {formatWhen(session.savedAt)}
               </span>
+              {dueBySession[session.id] > 0 && (
+                <span className="session__due">{dueBySession[session.id]} due today</span>
+              )}
             </button>
             <button
               type="button"

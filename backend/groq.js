@@ -66,46 +66,8 @@ export function assertConfigured() {
  * @param {AbortSignal} [args.signal] aborted when the browser disconnects
  * @returns {Promise<{content: string, usage: object|undefined}>}
  */
-export async function callGroq({ messages, signal, temperature = 0.3, maxTokens = 4096 }) {
-  assertConfigured();
-
-  // Our own timeout, plus the caller's cancellation, as one signal.
-  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-  const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
-
-  let response;
-  try {
-    response = await fetch(GROQ_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey()}`,
-      },
-      body: JSON.stringify({
-        model: process.env.GROQ_MODEL || DEFAULT_MODEL,
-        messages,
-        temperature,
-        max_tokens: maxTokens,
-        response_format: { type: 'json_object' },
-      }),
-      signal: combined,
-    });
-  } catch (error) {
-    if (signal?.aborted) throw new UpstreamError('client_aborted', 'Request cancelled.', { status: 499 });
-    if (error.name === 'TimeoutError' || error.name === 'AbortError') {
-      throw new UpstreamError('timeout', 'The model took too long to respond.', { status: 504, retryable: true });
-    }
-    // `fetch` reports transport failures as a bare TypeError and hides the real
-    // reason (DNS, TLS, ECONNREFUSED…) on `cause`. Log it: without this, a
-    // deploy that cannot reach Groq looks identical to one that can't resolve
-    // it, and the user-facing message is the same either way.
-    console.error('[groq] request failed:', error.name, error.message, '| cause:', error.cause ?? '(none)');
-    throw new UpstreamError('network', 'Could not reach the model provider.', { status: 502, retryable: true });
-  }
-
-  if (!response.ok) {
-    throw await describeHttpFailure(response);
-  }
+export async function callGroq({ messages, signal, model = primaryModel(), temperature = 0.3, maxTokens = 4096 }) {
+  const response = await send({ model, messages, temperature, max_tokens: maxTokens }, signal);
 
   let payload;
   try {
@@ -128,7 +90,143 @@ export async function callGroq({ messages, signal, temperature = 0.3, maxTokens 
   }
 
   // Surfaced so the caller can tell "bad JSON" apart from "ran out of room".
-  return { content, finishReason: choice?.finish_reason, usage: payload?.usage };
+  return { content, finishReason: choice?.finish_reason, usage: payload?.usage, model };
+}
+
+/**
+ * The same call, streamed. `onText` receives the whole response so far each
+ * time a chunk arrives, so the caller can parse partial JSON as it grows.
+ *
+ * Groq streams OpenAI-style server-sent events: `data: {choices:[{delta}]}`
+ * lines, ending with `data: [DONE]`.
+ *
+ * @param {object} args
+ * @param {(textSoFar: string) => void} [args.onText]
+ * @returns {Promise<{content: string, finishReason: string | undefined, model: string}>}
+ */
+export async function callGroqStream({ messages, signal, onText, model = primaryModel(), temperature = 0.3, maxTokens = 4096 }) {
+  const response = await send({ model, messages, temperature, max_tokens: maxTokens, stream: true }, signal);
+  if (!response.body) {
+    throw new UpstreamError('stream_failed', 'The model provider did not stream a response.', { status: 502, retryable: true });
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let content = '';
+  let finishReason;
+
+  const handleLine = (line) => {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('data:')) return false;
+    const data = trimmed.slice(5).trim();
+    if (data === '[DONE]') return true;
+
+    let chunk;
+    try {
+      chunk = JSON.parse(data);
+    } catch {
+      throw new UpstreamError('stream_failed', 'The model provider sent a malformed stream.', { status: 502, retryable: true });
+    }
+    if (chunk?.error) {
+      throw new UpstreamError('upstream', chunk.error.message || 'The model provider reported an error.', {
+        status: 502,
+        retryable: true,
+      });
+    }
+    const choice = chunk?.choices?.[0];
+    const delta = choice?.delta?.content;
+    if (typeof delta === 'string' && delta) {
+      content += delta;
+      onText?.(content);
+    }
+    if (choice?.finish_reason) finishReason = choice.finish_reason;
+    return false;
+  };
+
+  try {
+    let done = false;
+    while (!done) {
+      const { value, done: ended } = await reader.read();
+      if (ended) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        if (handleLine(line)) {
+          done = true;
+          break;
+        }
+      }
+    }
+    if (!done && buffer) handleLine(buffer);
+  } catch (error) {
+    if (error instanceof UpstreamError) throw error;
+    const mapped = transportError(error, signal);
+    // The connection worked and then broke: worth one non-streamed try.
+    if (mapped.code === 'network') {
+      throw new UpstreamError('stream_failed', 'The stream from the model provider broke off.', {
+        status: 502,
+        retryable: true,
+      });
+    }
+    throw mapped;
+  } finally {
+    reader.releaseLock?.();
+  }
+
+  if (content.trim() === '') {
+    throw new UpstreamError('empty_completion', 'The model returned an empty response.', { status: 502, retryable: true });
+  }
+  return { content, finishReason, model };
+}
+
+export function primaryModel() {
+  return process.env.GROQ_MODEL || DEFAULT_MODEL;
+}
+
+/**
+ * POSTs a chat-completions request and returns the response if it's a 2xx.
+ * Every failure becomes an UpstreamError the UI knows how to describe.
+ */
+async function send(body, signal) {
+  assertConfigured();
+
+  // Our own timeout, plus the caller's cancellation, as one signal. It also
+  // covers reading a streamed body, not just waiting for the headers.
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
+
+  let response;
+  try {
+    response = await fetch(GROQ_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey()}`,
+      },
+      body: JSON.stringify({ ...body, response_format: { type: 'json_object' } }),
+      signal: combined,
+    });
+  } catch (error) {
+    throw transportError(error, signal);
+  }
+
+  if (!response.ok) throw await describeHttpFailure(response);
+  return response;
+}
+
+function transportError(error, signal) {
+  if (signal?.aborted) return new UpstreamError('client_aborted', 'Request cancelled.', { status: 499 });
+  if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
+    return new UpstreamError('timeout', 'The model took too long to respond.', { status: 504, retryable: true });
+  }
+  // `fetch` reports transport failures as a bare TypeError and hides the real
+  // reason (DNS, TLS, ECONNREFUSED…) on `cause`. Log it: without this, a
+  // deploy that cannot reach Groq looks identical to one that can't resolve
+  // it, and the user-facing message is the same either way.
+  console.error('[groq] request failed:', error?.name, error?.message, '| cause:', error?.cause ?? '(none)');
+  return new UpstreamError('network', 'Could not reach the model provider.', { status: 502, retryable: true });
 }
 
 async function describeHttpFailure(response) {

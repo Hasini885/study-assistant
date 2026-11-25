@@ -2909,3 +2909,29 @@ kbd {
 .grounding-summary.is-ok {
   color: var(--correct);
 }
+
+/* -------------------------------------------------------------- streaming -- */
+
+/* A card that has streamed in, standing where its skeleton was. */
+.stream-card {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--paper);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  line-height: 1.35;
+  animation: riseIn 0.3s ease backwards;
+}
+
+.stream-card__num {
+  flex-shrink: 0;
+  font-family: var(--font);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--accent);
+  padding-top: 2px;
+}

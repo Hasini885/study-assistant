@@ -321,7 +321,7 @@ export default function App() {
                 </section>
               )}
 
-              {study.status === 'loading' && <LoadingState onCancel={study.cancel} />}
+              {study.status === 'loading' && <LoadingState onCancel={study.cancel} partial={study.partial} />}
 
               {hasSet && (
                 <StudySetView

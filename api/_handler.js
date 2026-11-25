@@ -16,6 +16,7 @@
 import 'dotenv/config'; // no-op in production; lets `vercel dev` read .env
 import { errorResponse, handleStudySetRequest } from '../backend/pipeline.js';
 import { clientIpFromHeaders } from '../backend/rateLimit.js';
+import { streamStudySet, wantsEventStream } from '../backend/sse.js';
 
 /**
  * @param {(body: unknown) => {messages: Array, topic: string}} build
@@ -33,14 +34,15 @@ export function createStudySetHandler(build) {
       if (!res.writableFinished) controller.abort();
     });
 
+    // Vercel's edge sets these and overwrites any client-supplied value.
+    const ip = clientIpFromHeaders(req.headers, req.socket?.remoteAddress);
+
+    if (wantsEventStream(req.headers)) {
+      return streamStudySet({ res, body: parseBody(req), ip, build, signal: controller.signal });
+    }
+
     try {
-      const result = await handleStudySetRequest({
-        body: parseBody(req),
-        // Vercel's edge sets these and overwrites any client-supplied value.
-        ip: clientIpFromHeaders(req.headers, req.socket?.remoteAddress),
-        build,
-        signal: controller.signal,
-      });
+      const result = await handleStudySetRequest({ body: parseBody(req), ip, build, signal: controller.signal });
       if (res.writableEnded) return undefined;
       return res.status(200).json(result);
     } catch (error) {

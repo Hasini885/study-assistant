@@ -7,29 +7,47 @@ import { useEffect, useState } from 'react';
  * not jump when content lands, and it exposes a cancel button — a 30 second
  * model call with no way out is a worse experience than an error.
  */
-export function LoadingState({ label = 'Building your study set', onCancel }) {
+export function LoadingState({ label = 'Building your study set', onCancel, partial = null }) {
   const elapsed = useElapsedSeconds();
 
+  // While the response streams in, completed cards replace skeletons one by
+  // one, so the wait shows progress rather than a spinner.
+  const arrived = partial?.flashcards ?? [];
+  const questions = partial?.quiz?.length ?? 0;
+  const skeletons = Math.max(0, 4 - arrived.length);
+
   return (
-    <section className="state state--loading" aria-live="polite" aria-busy="true">
+    <section className="state state--loading" aria-busy="true">
       <div className="state__header">
         <span className="spinner" aria-hidden="true" />
         <div>
-          <h2 className="state__title">{label}…</h2>
-          <p className="state__note">
-            {elapsed < 8
-              ? 'Usually takes a few seconds.'
-              : elapsed < 20
-                ? 'Still working — longer notes take longer.'
-                : 'This is slower than usual. You can cancel and try again.'}{' '}
+          <h2 className="state__title">{partial?.title ? `Writing “${partial.title}”` : label}…</h2>
+          <p className="state__note" aria-live="polite">
+            {arrived.length > 0
+              ? `${arrived.length} card${arrived.length === 1 ? '' : 's'}${
+                  questions ? ` and ${questions} question${questions === 1 ? '' : 's'}` : ''
+                } so far.`
+              : elapsed < 8
+                ? 'Usually takes a few seconds.'
+                : elapsed < 20
+                  ? 'Still working — longer notes take longer.'
+                  : 'This is slower than usual. You can cancel and try again.'}{' '}
             <span className="state__timer">{elapsed}s</span>
           </p>
         </div>
       </div>
 
-      <div className="skeleton-grid" aria-hidden="true">
-        {Array.from({ length: 4 }, (_, i) => (
-          <div className="skeleton-card" key={i} style={{ animationDelay: `${i * 120}ms` }}>
+      <div className="skeleton-grid">
+        {arrived.map((card, i) => (
+          <div className="stream-card" key={card.id} style={{ '--i': i }}>
+            <span className="stream-card__num" aria-hidden="true">
+              {i + 1}
+            </span>
+            <span className="stream-card__front">{card.front}</span>
+          </div>
+        ))}
+        {Array.from({ length: skeletons }, (_, i) => (
+          <div className="skeleton-card" key={`s-${i}`} style={{ animationDelay: `${i * 120}ms` }} aria-hidden="true">
             <div className="skeleton-line skeleton-line--short" />
             <div className="skeleton-line" />
             <div className="skeleton-line skeleton-line--medium" />

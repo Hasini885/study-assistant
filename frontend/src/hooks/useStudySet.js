@@ -22,6 +22,7 @@ const initialState = {
   meta: null,
   error: null,
   lastRequest: null, // replayed by the Retry button
+  partial: null, // items that have streamed in so far, while status is 'loading'
 };
 
 function reducer(state, action) {
@@ -38,10 +39,15 @@ function reducer(state, action) {
         studySet: action.mode === 'refine' ? state.studySet : null,
         meta: action.mode === 'refine' ? state.meta : null,
         lastRequest: action.request,
+        partial: null,
       };
 
+    case 'partial':
+      // A preview while generating; it never replaces a set already on screen.
+      return state.status === 'loading' ? { ...state, partial: action.studySet } : state;
+
     case 'success':
-      return { ...state, status: 'ready', studySet: action.studySet, meta: action.meta, error: null };
+      return { ...state, status: 'ready', studySet: action.studySet, meta: action.meta, error: null, partial: null };
 
     case 'failure':
       return {
@@ -49,10 +55,11 @@ function reducer(state, action) {
         // A failed refinement must not destroy the set the user already has.
         status: state.studySet ? 'ready' : 'error',
         error: action.error,
+        partial: null,
       };
 
     case 'cancel':
-      return { ...state, status: state.studySet ? 'ready' : 'idle', error: null };
+      return { ...state, status: state.studySet ? 'ready' : 'idle', error: null, partial: null };
 
     case 'load':
       return { ...initialState, status: 'ready', studySet: action.studySet, meta: action.meta };
@@ -67,6 +74,8 @@ function reducer(state, action) {
       return state;
   }
 }
+
+export { reducer as studySetReducer, initialState as initialStudySetState };
 
 export function useStudySet() {
   const [state, dispatch] = useReducer(reducer, initialState);
@@ -90,7 +99,11 @@ export function useStudySet() {
       const result =
         request.mode === 'refine'
           ? await refineStudySet(request.payload, controller.signal)
-          : await createStudySet(request.payload, controller.signal);
+          : await createStudySet(request.payload, controller.signal, {
+              // Streamed items pass through the same sequence check as the
+              // final result, so a superseded stream can't paint over a newer one.
+              onPartial: (studySet) => dispatch({ type: 'partial', studySet, seq, currentSeq: seqRef.current }),
+            });
 
       dispatch({ type: 'success', ...result, seq, currentSeq: seqRef.current });
     } catch (error) {

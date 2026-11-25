@@ -22,6 +22,7 @@ import {
   handleStudySetRequest,
   healthPayload,
 } from './pipeline.js';
+import { streamStudySet, wantsEventStream } from './sse.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = Number(process.env.PORT) || 8787;
@@ -48,15 +49,17 @@ async function run(req, res, build) {
     if (!res.writableFinished) controller.abort();
   });
 
+  // The socket address, not X-Forwarded-For: with no trusted proxy in front,
+  // that header is whatever the client wants it to be.
+  const ip = req.ip ?? req.socket.remoteAddress;
+
+  if (wantsEventStream(req.headers)) {
+    await streamStudySet({ res, body: req.body, ip, build, signal: controller.signal });
+    return;
+  }
+
   try {
-    const result = await handleStudySetRequest({
-      body: req.body,
-      // The socket address, not X-Forwarded-For: with no trusted proxy in
-      // front, that header is whatever the client wants it to be.
-      ip: req.ip ?? req.socket.remoteAddress,
-      build,
-      signal: controller.signal,
-    });
+    const result = await handleStudySetRequest({ body: req.body, ip, build, signal: controller.signal });
     if (res.writableEnded) return;
     res.json(result);
   } catch (error) {

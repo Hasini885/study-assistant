@@ -7,7 +7,7 @@
  * set", and no chance of the two drifting apart.
  */
 
-import { callGroq, hasApiKey, UpstreamError } from './groq.js';
+import { callGroq, callGroqStream, hasApiKey, primaryModel, UpstreamError } from './groq.js';
 import { buildGenerateMessages, buildRefineMessages, buildRepairMessages } from './prompt.js';
 import { createRateLimiter, secondsUntil } from './rateLimit.js';
 import { reconcileIds } from './shared/ids.js';
@@ -21,7 +21,7 @@ const MAX_ATTEMPTS = 2; // one initial call, one self-repair
 export { UpstreamError };
 
 export function defaultModel() {
-  return process.env.GROQ_MODEL || 'llama-3.3-70b-versatile';
+  return primaryModel();
 }
 
 export function healthPayload() {
@@ -66,8 +66,19 @@ export async function handleStudySetRequest({
   limiter = defaultLimiter(),
   generate = generateStudySet,
 }) {
+  const request = await prepareStudySetRequest({ body, ip, build, limiter });
+  return generate({ ...request, signal });
+}
+
+/**
+ * Everything that can reject a request before any model call: the rate limit
+ * and input validation. Split out so the streaming transport can run it while
+ * it can still answer with a real 4xx status, before committing to a 200
+ * event stream.
+ */
+export async function prepareStudySetRequest({ body, ip, build, limiter = defaultLimiter() }) {
   await enforceRateLimit(ip, limiter);
-  return generate({ ...build(body), signal });
+  return build(body);
 }
 
 /**
@@ -147,16 +158,23 @@ export function buildRefineRequest(body) {
  * @param {object} [args.previous] the set being refined, whose ids carry over
  * @param {string | null} [args.notes] the user's notes, to verify source quotes against
  * @param {AbortSignal} [args.signal]
+ * @param {(studySet: object) => void} [args.onPartial] if given, the first attempt is streamed and
+ *   this receives the items that have fully arrived so far
  * @returns {Promise<{studySet: object, meta: object}>}
  */
-export async function generateStudySet({ messages, topic, previous, notes, signal }) {
+export async function generateStudySet({ messages, topic, previous, notes, signal, onPartial }) {
   const startedAt = Date.now();
   let attemptMessages = messages;
   let lastProblem = 'Unknown parsing failure.';
   const repairs = [];
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const completion = await callGroq({ messages: attemptMessages, signal });
+    // Only the first attempt streams. A repair attempt follows a failure the
+    // user has already waited through; it should just arrive whole.
+    const completion =
+      onPartial && attempt === 1
+        ? await streamAttempt({ messages: attemptMessages, signal, topic, onPartial })
+        : await callGroq({ messages: attemptMessages, signal });
     const truncated = completion.finishReason === 'length';
 
     const extracted = extractJson(completion.content);
@@ -180,7 +198,7 @@ export async function generateStudySet({ messages, topic, previous, notes, signa
             repairs: [...repairs, ...normalized.repairs],
             attempts: attempt,
             recovery: extracted.strategy,
-            model: defaultModel(),
+            model: completion.model ?? defaultModel(),
             durationMs: Date.now() - startedAt,
             ...(grounding && { grounding }),
           },
@@ -214,6 +232,94 @@ export async function generateStudySet({ messages, topic, previous, notes, signa
     `The model returned something we could not use (${lastProblem}). Retrying often fixes this.`,
     { status: 502, retryable: true }
   );
+}
+
+/** Stream failures where an ordinary request is still worth trying. */
+const STREAM_FALLBACK_CODES = new Set(['stream_failed', 'bad_envelope', 'upstream']);
+
+/**
+ * One streamed model call, reporting each newly completed item through
+ * `onPartial`. Parsing is only attempted when a `}` arrives — nothing can have
+ * completed otherwise — so a long response isn't re-parsed on every token.
+ *
+ * If streaming itself fails (the provider rejects it, or the stream breaks
+ * off), the same request is made again without streaming. Cancellation,
+ * timeouts and rate limits are not retried.
+ */
+async function streamAttempt({ messages, signal, topic, onPartial }) {
+  let scanned = 0;
+  let braces = 0;
+  let parsedAtBraces = 0;
+  let lastSignature = '';
+
+  const onText = (text) => {
+    for (let i = scanned; i < text.length; i++) if (text[i] === '}') braces++;
+    scanned = text.length;
+    if (braces === parsedAtBraces) return;
+    parsedAtBraces = braces;
+
+    const partial = partialStudySet(text, { topic });
+    if (!partial) return;
+    const signature = `${partial.flashcards.length}:${partial.quiz.length}`;
+    if (signature === lastSignature) return;
+    lastSignature = signature;
+    try {
+      onPartial(partial);
+    } catch {
+      /* a listener that has gone away must not fail the generation */
+    }
+  };
+
+  try {
+    return await callGroqStream({ messages, signal, onText });
+  } catch (error) {
+    if (!(error instanceof UpstreamError) || !STREAM_FALLBACK_CODES.has(error.code)) throw error;
+    console.warn(`[stream] ${error.code}: falling back to a non-streamed request`);
+    return callGroq({ messages, signal });
+  }
+}
+
+/**
+ * The items that have fully arrived in a response that is still streaming.
+ *
+ * extractJson's truncation recovery closes whatever is open, so the text so
+ * far parses — but the item being written when the text was cut may be
+ * half-finished ("back": "The energy curr…). The list whose key appears last
+ * in the text is the one still being written, so it loses its last item; a
+ * list that came before it is already closed and is kept whole. (The schema
+ * puts flashcards first, but this doesn't rely on the model honouring that.)
+ *
+ * @returns {object | null} a study set, or null if no complete item has arrived yet
+ */
+export function partialStudySet(text, { topic = '' } = {}) {
+  const extracted = extractJson(text);
+  if (!extracted.ok) return null;
+
+  // Drop the raw element being written *before* normalizing. Afterwards it's
+  // too late to tell: the normalizer may already have discarded it (a card
+  // with no back yet), and trimming then would lose a complete item instead.
+  let raw = extracted.value;
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    const writingQuiz = lastKeyIndex(text, QUIZ_KEYS) > lastKeyIndex(text, FLASHCARD_KEYS);
+    const key = (writingQuiz ? QUIZ_KEYS : FLASHCARD_KEYS).find((k) => Array.isArray(raw[k]));
+    if (key) raw = { ...raw, [key]: raw[key].slice(0, -1) };
+  }
+
+  const normalized = normalizeStudySet(raw, { topic });
+  return normalized.ok ? normalized.data : null;
+}
+
+// Mirrors the key aliases normalizeStudySet accepts.
+const FLASHCARD_KEYS = ['flashcards', 'cards', 'flash_cards', 'deck'];
+const QUIZ_KEYS = ['quiz', 'questions', 'quizQuestions', 'quiz_questions', 'mcqs'];
+
+function lastKeyIndex(text, keys) {
+  let last = -1;
+  for (const key of keys) {
+    const pattern = new RegExp(`"${key}"\\s*:`, 'g');
+    for (const match of text.matchAll(pattern)) last = Math.max(last, match.index);
+  }
+  return last;
 }
 
 /**

@@ -18,12 +18,14 @@ const REQUEST_TIMEOUT_MS = Number(process.env.REQUEST_TIMEOUT_MS) || 25_000;
 
 /** Errors we can describe to the user, as opposed to unexpected crashes. */
 export class UpstreamError extends Error {
-  constructor(code, message, { status = 502, retryable = false } = {}) {
+  constructor(code, message, { status = 502, retryable = false, retryAfter } = {}) {
     super(message);
     this.name = 'UpstreamError';
     this.code = code;
     this.status = status;
     this.retryable = retryable;
+    /** Seconds; sent as a Retry-After header when set. */
+    this.retryAfter = retryAfter;
   }
 }
 

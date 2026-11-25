@@ -19,7 +19,7 @@ import {
   buildGenerateRequest,
   buildRefineRequest,
   errorResponse,
-  generateStudySet,
+  handleStudySetRequest,
   healthPayload,
 } from './pipeline.js';
 
@@ -49,14 +49,19 @@ async function run(req, res, build) {
   });
 
   try {
-    const { messages, topic } = build(req.body);
-    const result = await generateStudySet({ messages, topic, signal: controller.signal });
+    const result = await handleStudySetRequest({
+      body: req.body,
+      // The socket address, not X-Forwarded-For: with no trusted proxy in
+      // front, that header is whatever the client wants it to be.
+      ip: req.ip ?? req.socket.remoteAddress,
+      build,
+      signal: controller.signal,
+    });
     if (res.writableEnded) return;
     res.json(result);
   } catch (error) {
     if (controller.signal.aborted || error?.code === 'client_aborted') return; // client is gone
-    const { status, body } = errorResponse(error);
-    res.status(status).json(body);
+    sendError(res, error);
   }
 }
 
@@ -68,10 +73,12 @@ if (process.env.NODE_ENV === 'production') {
   app.get('*', (req, res) => res.sendFile(path.join(dist, 'index.html')));
 }
 
-app.use((error, req, res, next) => {
-  const { status, body } = errorResponse(error);
-  res.status(status).json(body);
-});
+app.use((error, req, res, next) => sendError(res, error));
+
+function sendError(res, error) {
+  const { status, headers, body } = errorResponse(error);
+  res.set(headers).status(status).json(body);
+}
 
 app.listen(PORT, () => {
   console.log(`  API listening on http://localhost:${PORT}`);

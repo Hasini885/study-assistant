@@ -17,6 +17,8 @@
     "test": "node --test"
   },
   "dependencies": {
+    "@upstash/ratelimit": "^2.2.2",
+    "@upstash/redis": "^1.41.1",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "react": "^18.3.1",

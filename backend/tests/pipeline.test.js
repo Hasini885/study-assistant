@@ -1,7 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildRefineRequest, UpstreamError } from '../pipeline.js';
+import {
+  buildGenerateRequest,
+  buildRefineRequest,
+  enforceRateLimit,
+  errorResponse,
+  handleStudySetRequest,
+  UpstreamError,
+} from '../pipeline.js';
 
 const question = { question: 'Where?', options: ['Stroma', 'Thylakoid'], answerIndex: 0, explanation: '' };
 
@@ -66,4 +73,107 @@ test('buildRefineRequest still rejects a set that is not a study set at all', ()
   const error = badRequest(() => buildRefineRequest({ studySet: { nope: true }, instruction: 'harder' }));
   assert.equal(error.status, 400);
   assert.match(error.message, /can no longer be refined/);
+});
+
+/* ------------------------------ rate limiting ----------------------------- */
+
+const allow = { check: async () => ({ success: true }) };
+
+function denyUntil(reset) {
+  const seen = [];
+  return { seen, check: async (id) => (seen.push(id), { success: false, reset }) };
+}
+
+async function rejection(promise) {
+  try {
+    await promise;
+  } catch (error) {
+    return error;
+  }
+  assert.fail('expected a rejection');
+}
+
+test('enforceRateLimit lets an allowed request through', async () => {
+  await enforceRateLimit('1.2.3.4', allow);
+});
+
+test('enforceRateLimit throws the 429 the UI already understands', async () => {
+  const limiter = denyUntil(Date.now() + 30_000);
+  const error = await rejection(enforceRateLimit('1.2.3.4', limiter));
+
+  assert.ok(error instanceof UpstreamError);
+  assert.equal(error.status, 429);
+  assert.equal(error.code, 'rate_limited'); // same code as Groq's own 429
+  assert.equal(error.retryable, true);
+  assert.ok(error.retryAfter >= 29 && error.retryAfter <= 30, String(error.retryAfter));
+  assert.match(error.message, /Try again in \d+ seconds/);
+  assert.deepEqual(limiter.seen, ['ip:1.2.3.4']);
+});
+
+test('enforceRateLimit buckets a missing IP as "unknown" rather than skipping the check', async () => {
+  const limiter = denyUntil(Date.now() + 1000);
+  await rejection(enforceRateLimit('', limiter));
+  assert.deepEqual(limiter.seen, ['ip:unknown']);
+});
+
+test('a rate-limited request never reaches validation or the model', async () => {
+  let built = false;
+  let generated = false;
+  const error = await rejection(
+    handleStudySetRequest({
+      body: { input: 'photosynthesis' },
+      ip: '1.2.3.4',
+      build: (body) => ((built = true), buildGenerateRequest(body)),
+      limiter: denyUntil(Date.now() + 5000),
+      generate: async () => {
+        generated = true;
+      },
+    })
+  );
+  assert.equal(error.status, 429);
+  assert.equal(built, false);
+  assert.equal(generated, false);
+});
+
+test('an allowed request is validated and then generated', async () => {
+  const signal = new AbortController().signal;
+  let received;
+  const result = await handleStudySetRequest({
+    body: { input: '  photosynthesis  ' },
+    ip: '1.2.3.4',
+    build: buildGenerateRequest,
+    signal,
+    limiter: allow,
+    generate: async (args) => {
+      received = args;
+      return { studySet: 'ok' };
+    },
+  });
+  assert.deepEqual(result, { studySet: 'ok' });
+  assert.equal(received.topic, 'photosynthesis');
+  assert.equal(received.signal, signal);
+});
+
+test('an allowed but invalid request still gets its 400', async () => {
+  const error = await rejection(
+    handleStudySetRequest({ body: { input: '' }, ip: '1.2.3.4', build: buildGenerateRequest, limiter: allow })
+  );
+  assert.equal(error.status, 400);
+});
+
+/* ----------------------------- error responses ---------------------------- */
+
+test('errorResponse adds Retry-After for a rate-limited request', () => {
+  const { status, headers, body } = errorResponse(
+    new UpstreamError('rate_limited', 'slow down', { status: 429, retryable: true, retryAfter: 12 })
+  );
+  assert.equal(status, 429);
+  assert.deepEqual(headers, { 'Retry-After': '12' });
+  assert.deepEqual(body, { error: { code: 'rate_limited', message: 'slow down', retryable: true } });
+});
+
+test('errorResponse sends no extra headers for other errors', (t) => {
+  t.mock.method(console, 'error', () => {});
+  assert.deepEqual(errorResponse(new UpstreamError('bad_request', 'x', { status: 400 })).headers, {});
+  assert.deepEqual(errorResponse(new Error('boom')).headers, {});
 });

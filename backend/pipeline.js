@@ -9,6 +9,7 @@
 
 import { callGroq, hasApiKey, UpstreamError } from './groq.js';
 import { buildGenerateMessages, buildRefineMessages, buildRepairMessages } from './prompt.js';
+import { createRateLimiter, secondsUntil } from './rateLimit.js';
 import { extractJson } from './shared/extractJson.js';
 import { normalizeStudySet, isValidStudySet, studySetLimitViolation } from './shared/normalize.js';
 
@@ -29,6 +30,59 @@ export function healthPayload() {
     configured: hasApiKey(),
     model: defaultModel(),
   };
+}
+
+/* -------------------------------------------------------------------------- */
+/* entry point                                                                */
+/* -------------------------------------------------------------------------- */
+
+let sharedLimiter = null;
+function defaultLimiter() {
+  // Created on first use, so env vars loaded by dotenv are already in place.
+  sharedLimiter ??= createRateLimiter();
+  return sharedLimiter;
+}
+
+/**
+ * What both transports call for /api/study-set and /api/refine: rate limit,
+ * validate, generate. The transports only work out the client's IP and wire
+ * up cancellation.
+ *
+ * @param {object} args
+ * @param {unknown} args.body   the parsed request body
+ * @param {string}  args.ip     the client's address, for rate limiting
+ * @param {(body: unknown) => {messages: Array, topic: string}} args.build
+ * @param {AbortSignal} [args.signal]
+ * @param {{check: (id: string) => Promise<{success: boolean, reset?: number}>}} [args.limiter] injectable for tests
+ * @param {typeof generateStudySet} [args.generate] injectable for tests
+ */
+export async function handleStudySetRequest({
+  body,
+  ip,
+  build,
+  signal,
+  limiter = defaultLimiter(),
+  generate = generateStudySet,
+}) {
+  await enforceRateLimit(ip, limiter);
+  const { messages, topic } = build(body);
+  return generate({ messages, topic, signal });
+}
+
+/**
+ * @throws {UpstreamError} a 429 with code `rate_limited` — the same code Groq's
+ *   own 429 maps to, so the UI already shows it as "slow down" with a Retry.
+ */
+export async function enforceRateLimit(ip, limiter = defaultLimiter()) {
+  const result = await limiter.check(`ip:${ip || 'unknown'}`);
+  if (result.success) return;
+
+  const retryAfter = secondsUntil(result.reset);
+  throw new UpstreamError(
+    'rate_limited',
+    `You're generating faster than this app allows. Try again in ${retryAfter} second${retryAfter === 1 ? '' : 's'}.`,
+    { status: 429, retryable: true, retryAfter }
+  );
 }
 
 /* -------------------------------------------------------------------------- */
@@ -176,7 +230,10 @@ function describeStrategy(strategy) {
   );
 }
 
-/** Turns any thrown value into the status + body we send to the browser. */
+/**
+ * Turns any thrown value into the status, headers and body we send to the browser.
+ * @returns {{status: number, headers: Record<string, string>, body: object}}
+ */
 export function errorResponse(error) {
   const known = error instanceof UpstreamError;
   if (!known) console.error('[unexpected]', error);
@@ -185,6 +242,7 @@ export function errorResponse(error) {
   return {
     // 499 is a client-disconnect marker, not a real HTTP response code.
     status: status === 499 ? 400 : status,
+    headers: known && error.retryAfter ? { 'Retry-After': String(error.retryAfter) } : {},
     body: {
       error: {
         code: known ? error.code : 'internal',

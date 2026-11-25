@@ -107,6 +107,9 @@ automatically. Before the first deploy, add one environment variable:
 | Name | Value |
 |---|---|
 | `GROQ_API_KEY` | your key from [console.groq.com/keys](https://console.groq.com/keys) |
+| `UPSTASH_REDIS_REST_URL` | optional — enables per-IP rate limiting (see below) |
+| `UPSTASH_REDIS_REST_TOKEN` | optional — pairs with the URL above |
+| `RATE_LIMIT_REQUESTS` / `RATE_LIMIT_WINDOW` | optional — defaults to `10` per `60 s` |
 
 Or from the CLI:
 
@@ -126,8 +129,16 @@ vercel --prod
   `REQUEST_TIMEOUT_MS` to match, otherwise the platform kills the function and the user gets an
   opaque gateway error instead of the app's own "the model timed out" message.
 - **Node 20+** is required (`AbortSignal.any`), pinned via `engines` in `package.json`.
-- **There is no auth or rate limiting.** Anyone with the URL can spend your Groq quota. Fine for
-  a portfolio link; add rate limiting before it goes anywhere real.
+- **Rate limiting needs Upstash.** `/api/study-set` and `/api/refine` share a per-IP sliding
+  window (10 requests a minute by default). Serverless instances share no memory, so the count
+  lives in Upstash Redis — a free database from [console.upstash.com](https://console.upstash.com),
+  or Vercel's Upstash integration. Without `UPSTASH_REDIS_REST_URL` / `_TOKEN` the limiter is a
+  no-op, which is what you want locally but means anyone with the URL can spend your Groq quota.
+  It fails open: if Upstash is down, requests go through rather than the app going down with it.
+  A limited request gets a `429` with `Retry-After`, shown in the UI as "Slow down a moment".
+- **Oversized refine payloads are rejected.** `/api/refine` takes the whole set from the browser,
+  so it's checked against the same `LIMITS` the normalizer enforces (card and question counts,
+  option counts, every string length) and refused with a `400` before anything reaches the model.
 - **Rotate your key** if it has ever been pasted somewhere it shouldn't be — deploying makes it
   live.
 - **Watch for invisible characters in the key.** The first deploy failed with a generic "could
@@ -504,7 +515,9 @@ I also used AI for CSS scaffolding. Every file here is one I can walk through an
   trip a 429 — refinement sends the whole set back, so it's a token-heavy request. The app
   surfaces this as a clear "Rate limit reached, wait a few seconds" error with a Retry button
   rather than a generic failure, but the limit itself is real. Waiting a few seconds fixes it.
-- **No rate limiting or auth on the API.** Fine for local use, not for deployment.
+- **No auth on the API.** Per-IP rate limiting is available (see *Deploying to Vercel*), but
+  it's off unless Upstash is configured, and an IP is a coarse identity — a shared campus
+  network is one bucket.
 - **20,000 character input cap**, and long notes can still hit the model's context limit — that
   returns a clear "input too long" error rather than failing mysteriously.
 - **Tests cover the parsing and repair layer only.** No component tests; the UI was verified by

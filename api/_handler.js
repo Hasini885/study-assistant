@@ -14,7 +14,8 @@
  */
 
 import 'dotenv/config'; // no-op in production; lets `vercel dev` read .env
-import { errorResponse, generateStudySet } from '../backend/pipeline.js';
+import { errorResponse, handleStudySetRequest } from '../backend/pipeline.js';
+import { clientIpFromHeaders } from '../backend/rateLimit.js';
 
 /**
  * @param {(body: unknown) => {messages: Array, topic: string}} build
@@ -33,13 +34,19 @@ export function createStudySetHandler(build) {
     });
 
     try {
-      const { messages, topic } = build(parseBody(req));
-      const result = await generateStudySet({ messages, topic, signal: controller.signal });
+      const result = await handleStudySetRequest({
+        body: parseBody(req),
+        // Vercel's edge sets these and overwrites any client-supplied value.
+        ip: clientIpFromHeaders(req.headers, req.socket?.remoteAddress),
+        build,
+        signal: controller.signal,
+      });
       if (res.writableEnded) return undefined;
       return res.status(200).json(result);
     } catch (error) {
       if (controller.signal.aborted || error?.code === 'client_aborted') return undefined;
-      const { status, body } = errorResponse(error);
+      const { status, headers, body } = errorResponse(error);
+      for (const [name, value] of Object.entries(headers)) res.setHeader(name, value);
       return res.status(status).json(body);
     }
   };

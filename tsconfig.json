@@ -1,0 +1,17 @@
+{
+  // Type-checks the shared contract (backend/shared) from its JSDoc annotations.
+  // Nothing is compiled: the code stays plain JavaScript and runs as written.
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "types": [],
+    "skipLibCheck": true
+  },
+  "include": ["backend/shared/**/*.js"]
+}

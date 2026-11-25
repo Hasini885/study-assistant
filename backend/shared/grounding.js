@@ -1,3 +1,11 @@
+// @ts-check
+/**
+ * @typedef {import('./types.js').StudySet} StudySet
+ * @typedef {import('./types.js').Flashcard} Flashcard
+ * @typedef {import('./types.js').QuizQuestion} QuizQuestion
+ * @typedef {import('./types.js').CardState} CardState
+ * @typedef {import('./types.js').Grade} Grade
+ */
 /**
  * Grounding: checking that study material drawn from pasted notes really
  * comes from those notes.
@@ -22,6 +30,8 @@ const MIN_FRAGMENT_CHARS = 6;
  * Is this input notes to draw from, rather than a topic to write about?
  * A topic is a phrase; notes are prose. 40 words is comfortably above any
  * topic anyone types and below a single paragraph of notes.
+ * @param {unknown} input
+ * @returns {boolean}
  */
 export function looksLikeNotes(input) {
   const words = String(input ?? '').trim().split(/\s+/).filter(Boolean);
@@ -32,6 +42,8 @@ export function looksLikeNotes(input) {
  * Folds away differences that don't change the words: case, curly vs
  * straight quotes, dash styles, ellipsis characters, markdown emphasis,
  * zero-width characters and whitespace.
+ * @param {unknown} text
+ * @returns {string}
  */
 export function normalizeForQuote(text) {
   return String(text ?? '')
@@ -50,6 +62,9 @@ export function normalizeForQuote(text) {
 /**
  * Does `quote` appear in `notes`? A quote with an ellipsis in the middle
  * ("the stroma ... light-independent") matches if each part appears, in order.
+ * @param {unknown} quote
+ * @param {unknown} notes
+ * @returns {boolean}
  */
 export function quoteAppearsIn(quote, notes) {
   const cleanQuote = normalizeForQuote(quote)
@@ -81,9 +96,12 @@ export function quoteAppearsIn(quote, notes) {
  * asked for one.
  *
  * @returns {{studySet: object, checked: number, verified: number}} a new set
+ * @param {StudySet} studySet
+ * @param {string} notes
  */
 export function verifyGrounding(studySet, notes) {
   let verified = 0;
+  /** @type {<T extends Flashcard | QuizQuestion>(item: T) => T} */
   const mark = (item) => {
     const grounded = Boolean(item.source) && quoteAppearsIn(item.source, notes);
     if (grounded) verified++;
@@ -104,6 +122,9 @@ export function verifyGrounding(studySet, notes) {
  * carries the set. An item keeps its verdict if it kept its id and its quote;
  * anything new or re-sourced has no verdict (`grounded` absent) rather than a
  * wrong one.
+ * @param {StudySet | null | undefined} previous
+ * @param {StudySet} next
+ * @returns {StudySet}
  */
 export function carryGrounding(previous, next) {
   const verdicts = new Map();
@@ -111,10 +132,11 @@ export function carryGrounding(previous, next) {
     if (typeof item.grounded === 'boolean') verdicts.set(`${item.id}\u0000${item.source ?? ''}`, item.grounded);
   }
 
+  /** @type {<T extends Flashcard | QuizQuestion>(item: T) => T} */
   const carry = (item) => {
     const { grounded: _ignored, ...rest } = item;
     const verdict = verdicts.get(`${item.id}\u0000${item.source ?? ''}`);
-    return verdict === undefined ? rest : { ...rest, grounded: verdict };
+    return /** @type {typeof item} */ (verdict === undefined ? rest : { ...rest, grounded: verdict });
   };
 
   return { ...next, flashcards: next.flashcards.map(carry), quiz: next.quiz.map(carry) };

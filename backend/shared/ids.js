@@ -1,3 +1,11 @@
+// @ts-check
+/**
+ * @typedef {import('./types.js').StudySet} StudySet
+ * @typedef {import('./types.js').Flashcard} Flashcard
+ * @typedef {import('./types.js').QuizQuestion} QuizQuestion
+ * @typedef {import('./types.js').CardState} CardState
+ * @typedef {import('./types.js').Grade} Grade
+ */
 /**
  * Stable identities for flashcards and quiz questions.
  *
@@ -16,12 +24,20 @@
 
 const ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
-/** Is this usable as an id we'd accept from the model or storage? */
+/**
+ * Is this usable as an id we'd accept from the model or storage?
+ * @param {unknown} value
+ * @returns {value is string}
+ */
 export function isWellFormedId(value) {
   return typeof value === 'string' && ID_PATTERN.test(value);
 }
 
-/** Case- and whitespace-insensitive form of a text, for matching. */
+/**
+ * Case- and whitespace-insensitive form of a text, for matching.
+ * @param {unknown} text
+ * @returns {string}
+ */
 export function matchKey(text) {
   return String(text ?? '')
     .toLowerCase()
@@ -29,7 +45,11 @@ export function matchKey(text) {
     .trim();
 }
 
-/** 32-bit FNV-1a, base 36. Not cryptographic — just short and stable. */
+/**
+ * 32-bit FNV-1a, base 36. Not cryptographic — just short and stable.
+ * @param {string} text
+ * @returns {string}
+ */
 export function hashString(text) {
   let hash = 0x811c9dc5;
   for (let i = 0; i < text.length; i++) {
@@ -39,12 +59,22 @@ export function hashString(text) {
   return (hash >>> 0).toString(36);
 }
 
-/** An id derived from an item's content: the same text always gets the same id. */
+/**
+ * An id derived from an item's content: the same text always gets the same id.
+ * @param {string} prefix
+ * @param {unknown} text
+ * @returns {string}
+ */
 export function contentId(prefix, text) {
   return `${prefix}-${hashString(matchKey(text))}`;
 }
 
-/** `base`, or `base-2`, `base-3`… — whichever isn't in `used` yet. Adds it to `used`. */
+/**
+ * `base`, or `base-2`, `base-3`… — whichever isn't in `used` yet. Adds it to `used`.
+ * @param {string} base
+ * @param {Set<string>} used
+ * @returns {string}
+ */
 export function claimUniqueId(base, used) {
   let id = base;
   for (let n = 2; used.has(id); n++) id = `${base}-${n}`;
@@ -64,6 +94,8 @@ export function claimUniqueId(base, used) {
  * already in use, in which case it gets a fresh one.
  *
  * @returns {{studySet: object, matched: number}} a new set (inputs are not mutated)
+ * @param {StudySet | null | undefined} previous
+ * @param {StudySet} next
  */
 export function reconcileIds(previous, next) {
   const flash = reconcileList(previous?.flashcards ?? [], next.flashcards, 'c', [
@@ -78,6 +110,14 @@ export function reconcileIds(previous, next) {
   };
 }
 
+/**
+ * @template {{id: string}} T
+ * @param {T[]} previousItems
+ * @param {T[]} nextItems
+ * @param {string} prefix
+ * @param {Array<(item: any) => unknown>} textGetters
+ * @returns {{items: T[], matched: number}}
+ */
 function reconcileList(previousItems, nextItems, prefix, textGetters) {
   const previousIds = new Set(previousItems.map((item) => item.id).filter(isWellFormedId));
   const claimed = new Set();

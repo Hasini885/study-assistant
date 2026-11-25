@@ -1,3 +1,11 @@
+// @ts-check
+/**
+ * @typedef {import('./types.js').StudySet} StudySet
+ * @typedef {import('./types.js').Flashcard} Flashcard
+ * @typedef {import('./types.js').QuizQuestion} QuizQuestion
+ * @typedef {import('./types.js').CardState} CardState
+ * @typedef {import('./types.js').Grade} Grade
+ */
 /**
  * Quiz question types, and checking a typed answer.
  *
@@ -15,19 +23,28 @@ export const QUIZ_TYPES = /** @type {const} */ (['mcq', 'truefalse', 'blank']);
 export const TRUE_FALSE_OPTIONS = Object.freeze(['True', 'False']);
 export const BLANK = '_____';
 
-/** @returns {'mcq' | 'truefalse' | 'blank'} */
+/**
+ * @returns {'mcq' | 'truefalse' | 'blank'}
+ * @param {Partial<QuizQuestion> | null | undefined} question
+ */
 export function quizType(question) {
   return question?.type === 'blank' || question?.type === 'truefalse' ? question.type : 'mcq';
 }
 
-/** The correct answer as text, whatever the type. */
+/**
+ * The correct answer as text, whatever the type.
+ * @param {QuizQuestion} question
+ * @returns {string | undefined}
+ */
 export function correctAnswerText(question) {
-  return quizType(question) === 'blank' ? question.answer : question.options?.[question.answerIndex];
+  return question.type === 'blank' ? question.answer : question.options?.[question.answerIndex];
 }
 
 /**
  * Case, accents, punctuation, spacing and a leading article don't make an
  * answer wrong: "The Mitochondria." matches "mitochondria".
+ * @param {unknown} text
+ * @returns {string}
  */
 export function normalizeAnswerText(text) {
   return String(text ?? '')
@@ -47,6 +64,9 @@ export function normalizeAnswerText(text) {
  * one slip from 5 characters, two from 9 — because a misspelt "mitocondria"
  * shows the student knows it. Anything with a digit in it must match exactly:
  * "1914" is not "1915".
+ * @param {unknown} input
+ * @param {{answer?: string, accepted?: string[]} | null | undefined} question
+ * @returns {boolean}
  */
 export function checkBlankAnswer(input, question) {
   const given = normalizeAnswerText(input);
@@ -64,7 +84,12 @@ export function checkBlankAnswer(input, question) {
   });
 }
 
-/** Levenshtein distance. Inputs here are short answers, so O(n·m) is fine. */
+/**
+ * Levenshtein distance. Inputs here are short answers, so O(n·m) is fine.
+ * @param {string} a
+ * @param {string} b
+ * @returns {number}
+ */
 export function editDistance(a, b) {
   let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
   for (let i = 1; i <= a.length; i++) {
@@ -80,11 +105,19 @@ export function editDistance(a, b) {
 /** Gap markers models use, all rewritten to one consistent BLANK. */
 const GAP_PATTERN = /_{2,}|\[(?:blank|\s*)\]|\{blank\}|\.{4,}|…{2,}/gi;
 
+/**
+ * @param {unknown} text
+ * @returns {boolean}
+ */
 export function hasGap(text) {
   GAP_PATTERN.lastIndex = 0;
   return GAP_PATTERN.test(String(text ?? ''));
 }
 
+/**
+ * @param {unknown} text
+ * @returns {string}
+ */
 export function normalizeGaps(text) {
   return String(text ?? '').replace(GAP_PATTERN, BLANK);
 }

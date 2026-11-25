@@ -1,3 +1,11 @@
+// @ts-check
+/**
+ * @typedef {import('./types.js').StudySet} StudySet
+ * @typedef {import('./types.js').Flashcard} Flashcard
+ * @typedef {import('./types.js').QuizQuestion} QuizQuestion
+ * @typedef {import('./types.js').CardState} CardState
+ * @typedef {import('./types.js').Grade} Grade
+ */
 /**
  * Spaced-repetition scheduling: a pure SM-2 variant with four grades.
  *
@@ -32,7 +40,10 @@ const MAX_EASE = 3.5;
 const RELEARN_DELAY = 10 * MINUTE;
 const MAX_INTERVAL_DAYS = 365;
 
-/** A card that has never been graded. */
+/**
+ * A card that has never been graded.
+ * @returns {CardState}
+ */
 export function newCardState() {
   return { reps: 0, lapses: 0, ease: START_EASE, interval: 0, due: 0, last: 0 };
 }
@@ -73,6 +84,12 @@ export function schedule(state, grade, now) {
   };
 }
 
+/**
+ * @param {CardState} prev
+ * @param {Exclude<Grade, 'again'>} grade
+ * @param {number} ease
+ * @returns {number}
+ */
 function nextInterval(prev, grade, ease) {
   let days;
   if (prev.reps === 0) {
@@ -93,12 +110,23 @@ function nextInterval(prev, grade, ease) {
   return Math.min(days, MAX_INTERVAL_DAYS);
 }
 
-/** What each grade would schedule, for labelling the buttons ("10m", "3d"). */
+/**
+ * What each grade would schedule, for labelling the buttons ("10m", "3d").
+ * @param {CardState | null | undefined} state
+ * @param {number} now
+ * @returns {Record<Grade, number>}
+ */
 export function previewIntervals(state, now) {
-  return Object.fromEntries(GRADES.map((grade) => [grade, schedule(state, grade, now).due - now]));
+  return /** @type {Record<Grade, number>} */ (
+    Object.fromEntries(GRADES.map((grade) => [grade, schedule(state, grade, now).due - now]))
+  );
 }
 
-/** "10m", "1d", "3w", "4mo" */
+/**
+ * "10m", "1d", "3w", "4mo"
+ * @param {number} ms
+ * @returns {string}
+ */
 export function formatInterval(ms) {
   if (!Number.isFinite(ms) || ms < 0) return '';
   if (ms < HOUR) return `${Math.max(1, Math.round(ms / MINUTE))}m`;
@@ -110,21 +138,31 @@ export function formatInterval(ms) {
   return `${Math.round((days / 365) * 10) / 10}y`;
 }
 
-/** The last millisecond of the local day containing `now`. */
+/**
+ * The last millisecond of the local day containing `now`.
+ * @param {number} now
+ * @returns {number}
+ */
 export function endOfDay(now) {
   const date = new Date(now);
   date.setHours(23, 59, 59, 999);
   return date.getTime();
 }
 
-/** Graded at least once, and due at or before the end of today. */
+/**
+ * Graded at least once, and due at or before the end of today.
+ * @param {unknown} state
+ * @param {number} now
+ * @returns {boolean}
+ */
 export function isDueToday(state, now) {
   return isValidCardState(state) && state.last > 0 && state.due <= endOfDay(now);
 }
 
 /**
  * Storage is untrusted, so state read back from it is checked field by field.
- * @returns {boolean}
+ * @param {any} value
+ * @returns {value is CardState}
  */
 export function isValidCardState(value) {
   return (
@@ -145,10 +183,18 @@ export function isValidCardState(value) {
   );
 }
 
+/**
+ * @param {any} n
+ * @returns {boolean}
+ */
 function isCount(n) {
   return Number.isInteger(n) && n >= 0;
 }
 
+/**
+ * @param {number} ease
+ * @returns {number}
+ */
 function clampEase(ease) {
   return Math.round(Math.min(MAX_EASE, Math.max(MIN_EASE, ease)) * 100) / 100;
 }

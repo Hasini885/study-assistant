@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Tolerant JSON extraction.
  *
@@ -9,12 +10,16 @@
  * Pure, dependency-free, and used on both the server and the client.
  */
 
-/** @returns {{ok: true, value: unknown, strategy: string} | {ok: false, error: string}} */
+/**
+ * @returns {{ok: true, value: unknown, strategy: string} | {ok: false, error: string}}
+ * @param {unknown} text
+ */
 export function extractJson(text) {
   if (typeof text !== 'string' || text.trim() === '') {
     return { ok: false, error: 'Model returned an empty response.' };
   }
 
+  /** @type {Array<[string, (s: string) => string]>} */
   const strategies = [
     ['direct', (s) => s],
     ['unfenced', stripCodeFences],
@@ -40,7 +45,11 @@ export function extractJson(text) {
   return { ok: false, error: 'Model response was not valid JSON.' };
 }
 
-/** Remove ```json ... ``` (or bare ```) wrappers. */
+/**
+ * Remove ```json ... ``` (or bare ```) wrappers.
+ * @param {string} text
+ * @returns {string}
+ */
 function stripCodeFences(text) {
   const fenced = text.match(/```(?:json|javascript|js)?\s*([\s\S]*?)```/i);
   if (fenced) return fenced[1];
@@ -52,6 +61,8 @@ function stripCodeFences(text) {
  * Grab the outermost {...} or [...] and drop any prose around it
  * ("Sure! Here are your flashcards:"). Brace counting is string- and
  * escape-aware, so a `}` inside a value doesn't end the scan early.
+ * @param {string} text
+ * @returns {string}
  */
 function sliceToOutermostJson(text) {
   const start = firstIndexOfAny(text, ['{', '[']);
@@ -99,6 +110,8 @@ function sliceToOutermostJson(text) {
  * Inside a string, “curly quotes”, a ", ]" or the word NaN are just content —
  * rewriting them there corrupts the text at best and, for quotes, ends the
  * string early and breaks the very parse this is trying to rescue.
+ * @param {string} text
+ * @returns {string}
  */
 function repairCommonBreakage(text) {
   // Smart quotes used *as* JSON delimiters, from models that "helpfully"
@@ -130,6 +143,8 @@ const CURLY_DOUBLE = new Set(['“', '”']);
  * string that a curly quote opened. Only the last needs rewriting — its
  * delimiters become `"`, and any straight `"` inside it is escaped so it stays
  * content.
+ * @param {string} text
+ * @returns {string}
  */
 function normaliseQuoteDelimiters(text) {
   let out = '';
@@ -168,6 +183,9 @@ function normaliseQuoteDelimiters(text) {
  * Applies `transform` to the parts of `text` that are not inside a string
  * literal. An unterminated string at the end (a truncated response) counts as
  * string content and is passed through untouched.
+ * @param {string} text
+ * @param {(segment: string) => string} transform
+ * @returns {string}
  */
 function mapOutsideStrings(text, transform) {
   let out = '';
@@ -194,6 +212,10 @@ function mapOutsideStrings(text, transform) {
   return out + (inString ? rest : transform(rest));
 }
 
+/**
+ * @param {string} text
+ * @returns {string}
+ */
 function closeUnterminated(text) {
   const stack = [];
   let inString = false;
@@ -230,6 +252,11 @@ function closeUnterminated(text) {
   return out;
 }
 
+/**
+ * @param {string} text
+ * @param {string[]} chars
+ * @returns {number}
+ */
 function firstIndexOfAny(text, chars) {
   const found = chars.map((c) => text.indexOf(c)).filter((i) => i !== -1);
   return found.length ? Math.min(...found) : -1;

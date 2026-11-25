@@ -1,3 +1,11 @@
+// @ts-check
+/**
+ * @typedef {import('./types.js').StudySet} StudySet
+ * @typedef {import('./types.js').Flashcard} Flashcard
+ * @typedef {import('./types.js').QuizQuestion} QuizQuestion
+ * @typedef {import('./types.js').CardState} CardState
+ * @typedef {import('./types.js').Grade} Grade
+ */
 /**
  * Shape validation and repair for study sets.
  *
@@ -38,8 +46,13 @@ export const LIMITS = {
   maxAccepted: 5,
 };
 
-/** @returns {{ok: true, data: object, repairs: string[]} | {ok: false, reason: string, repairs: string[]}} */
+/**
+ * @returns {{ok: true, data: object, repairs: string[]} | {ok: false, reason: string, repairs: string[]}}
+ * @param {unknown} raw
+ * @param {{topic?: string}} [options]
+ */
 export function normalizeStudySet(raw, { topic = '' } = {}) {
+  /** @type {string[]} */
   const repairs = [];
   const root = unwrap(raw, repairs);
 
@@ -81,6 +94,11 @@ export function normalizeStudySet(raw, { topic = '' } = {}) {
 /* flashcards                                                                 */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * @param {unknown[]} list
+ * @param {string[]} repairs
+ * @returns {Flashcard[]}
+ */
 function normalizeFlashcards(list, repairs) {
   const out = [];
   const seen = new Set();
@@ -132,6 +150,11 @@ function normalizeFlashcards(list, repairs) {
 /* quiz                                                                       */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * @param {unknown[]} list
+ * @param {string[]} repairs
+ * @returns {QuizQuestion[]}
+ */
 function normalizeQuiz(list, repairs) {
   const out = [];
   const usedIds = new Set();
@@ -178,9 +201,14 @@ function normalizeQuiz(list, repairs) {
   return out;
 }
 
-/** Options sometimes arrive as objects ({text, correct}) or as "A) Paris". */
+/**
+ * Options sometimes arrive as objects ({text, correct}) or as "A) Paris".
+ * @param {Record<string, any>} item
+ * @returns {{options: string[], correctFromObject: number}}
+ */
 function readOptions(item) {
   const rawOptions = pickArray(item, ['options', 'choices', 'answers', 'alternatives']);
+  /** @type {string[]} */
   const options = [];
   let correctFromObject = -1;
   for (const opt of rawOptions) {
@@ -207,6 +235,10 @@ function readOptions(item) {
  * Which kind of question this is. An explicit `type` wins (under any of the
  * names models use for it); otherwise the shape decides — True/False options,
  * or a gap in the question with a typed answer and no options.
+ * @param {Record<string, any>} item
+ * @param {string} question
+ * @param {string[]} options
+ * @returns {'mcq' | 'truefalse' | 'blank'}
  */
 function detectType(item, question, options) {
   const declared = String(pick(item, ['type', 'kind', 'format', 'questionType', 'question_type']) ?? '').toLowerCase();
@@ -222,6 +254,13 @@ function detectType(item, question, options) {
   return 'mcq';
 }
 
+/**
+ * @param {Record<string, any>} item
+ * @param {string} question
+ * @param {string[]} options
+ * @param {number} correctFromObject
+ * @returns {{type: 'mcq', question: string, options: string[], answerIndex: number} | null}
+ */
 function normalizeChoice(item, question, options, correctFromObject) {
   if (options.length < LIMITS.minOptions) return null;
   const answerIndex = resolveAnswerIndex(item, options, correctFromObject);
@@ -229,7 +268,14 @@ function normalizeChoice(item, question, options, correctFromObject) {
   return { type: 'mcq', question, options, answerIndex };
 }
 
-/** Always stored as ['True', 'False'] so the answer index means the same thing everywhere. */
+/**
+ * Always stored as ['True', 'False'] so the answer index means the same thing everywhere.
+ * @param {Record<string, any>} item
+ * @param {string} question
+ * @param {string[]} options
+ * @param {number} correctFromObject
+ * @returns {{type: 'truefalse', question: string, options: string[], answerIndex: number} | null}
+ */
 function normalizeTrueFalse(item, question, options, correctFromObject) {
   let isTrue = null;
 
@@ -251,6 +297,11 @@ function normalizeTrueFalse(item, question, options, correctFromObject) {
   return { type: 'truefalse', question, options: [...TRUE_FALSE_OPTIONS], answerIndex: isTrue ? 0 : 1 };
 }
 
+/**
+ * @param {Record<string, any>} item
+ * @param {string} question
+ * @returns {{type: 'blank', question: string, answer: string, accepted: string[]} | null}
+ */
 function normalizeBlank(item, question) {
   const answer = cleanString(
     pick(item, ['answer', 'correctAnswer', 'correct_answer', 'solution', 'blank', 'expected']),
@@ -274,6 +325,10 @@ function normalizeBlank(item, question) {
  * different ways, and getting it wrong silently would mark right answers as
  * wrong — the worst possible failure for a study tool. When we can't be sure,
  * we return -1 and drop the question.
+ * @param {Record<string, any>} item
+ * @param {string[]} options
+ * @param {number} correctFromObject
+ * @returns {number}
  */
 function resolveAnswerIndex(item, options, correctFromObject) {
   if (correctFromObject >= 0) return correctFromObject;
@@ -317,14 +372,18 @@ function resolveAnswerIndex(item, options, correctFromObject) {
 
   // Last resort: unambiguous substring match (exactly one option contains it).
   const partial = options
-    .map((o, i) => [o.toLowerCase(), i])
+    .map((o, i) => /** @type {[string, number]} */ ([o.toLowerCase(), i]))
     .filter(([o]) => target.length > 2 && (o.includes(target) || target.includes(o)));
   if (partial.length === 1) return partial[0][1];
 
   return -1;
 }
 
-/** "A) Paris" / "3. Paris" / "- Paris" -> "Paris" */
+/**
+ * "A) Paris" / "3. Paris" / "- Paris" -> "Paris"
+ * @param {unknown} text
+ * @returns {string}
+ */
 function stripOptionLabel(text) {
   if (typeof text !== 'string') return '';
   return text.replace(/^\s*(?:[-*•]\s*|\(?[a-zA-Z]\)[.:]?\s*|\(?\d+\)?[.:]\s*)/, '').trim();
@@ -334,8 +393,14 @@ function stripOptionLabel(text) {
 /* helpers                                                                    */
 /* -------------------------------------------------------------------------- */
 
-/** Peel off wrappers like {data: {...}} or {studySet: {...}} or [ {...} ]. */
+/**
+ * Peel off wrappers like {data: {...}} or {studySet: {...}} or [ {...} ].
+ * @param {unknown} raw
+ * @param {string[]} repairs
+ * @returns {unknown}
+ */
 function unwrap(raw, repairs) {
+  /** @type {any} */
   let node = raw;
   for (let depth = 0; depth < 3; depth++) {
     if (Array.isArray(node)) {
@@ -357,6 +422,11 @@ function unwrap(raw, repairs) {
   return node;
 }
 
+/**
+ * @param {unknown} obj
+ * @param {string[]} keys
+ * @returns {any}
+ */
 function pick(obj, keys) {
   if (!isPlainObject(obj)) return undefined;
   for (const key of keys) {
@@ -365,6 +435,11 @@ function pick(obj, keys) {
   return undefined;
 }
 
+/**
+ * @param {unknown} obj
+ * @param {string[]} keys
+ * @returns {unknown[]}
+ */
 function pickArray(obj, keys) {
   const value = pick(obj, keys);
   return Array.isArray(value) ? value : [];
@@ -375,7 +450,13 @@ const RESERVED_CARD_KEYS = new Set([
   'q', 'a', 'prompt', 'response', 'name', 'value', 'hint', 'clue', 'tip',
 ]);
 
-/** Turn strings, tuples, or objects into a {front, back} pair. */
+/**
+ * Turn strings, tuples, or objects into a {front, back} pair.
+ * @param {unknown} item
+ * @param {string[]} frontKeys
+ * @param {string[]} backKeys
+ * @returns {{front: unknown, back: unknown} | null}
+ */
 function coerceToPair(item, frontKeys, backKeys) {
   if (isPlainObject(item)) {
     const front = pick(item, frontKeys);
@@ -406,6 +487,8 @@ function coerceToPair(item, frontKeys, backKeys) {
  * The optional supporting quote. Only present when the model gave one, so sets
  * made from a bare topic don't carry an empty field around. `grounded` is
  * never read from the model — only the server's own check sets it.
+ * @param {unknown} item
+ * @returns {{source?: string}}
  */
 function sourceField(item) {
   if (!isPlainObject(item)) return {};
@@ -414,6 +497,11 @@ function sourceField(item) {
   return source ? { source } : {};
 }
 
+/**
+ * @param {unknown} value
+ * @param {number} max
+ * @returns {string}
+ */
 function cleanString(value, max) {
   if (typeof value === 'number' || typeof value === 'boolean') value = String(value);
   if (typeof value !== 'string') return '';
@@ -423,19 +511,35 @@ function cleanString(value, max) {
   return `${trimmed.slice(0, max - 1).trimEnd()}…`;
 }
 
+/**
+ * @param {string} topic
+ * @returns {string}
+ */
 function fallbackTitle(topic) {
   const clean = cleanString(topic, 60);
   return clean ? `Study set: ${clean}` : 'Study set';
 }
 
+/**
+ * @param {unknown} v
+ * @returns {v is Record<string, any>}
+ */
 function isPlainObject(v) {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
+/**
+ * @param {unknown} v
+ * @returns {v is string | number | boolean}
+ */
 function isScalar(v) {
   return typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean';
 }
 
+/**
+ * @param {unknown} v
+ * @returns {boolean}
+ */
 function isTruthy(v) {
   return v === true || v === 'true' || v === 1 || v === '1';
 }
@@ -444,6 +548,11 @@ function isTruthy(v) {
  * An id the model sent back (refinement round-trips them), or one derived from
  * the item's text — so the same card gets the same id every time it's
  * normalized, which is what lets progress survive a refine. See ids.js.
+ * @param {unknown} item
+ * @param {string} prefix
+ * @param {string} text
+ * @param {Set<string>} usedIds
+ * @returns {string}
  */
 function itemId(item, prefix, text, usedIds) {
   const given = isPlainObject(item) ? item.id : undefined;
@@ -461,6 +570,7 @@ function itemId(item, prefix, text, usedIds) {
  * produced. So this reports instead of repairing.
  *
  * @returns {string | null} what is wrong, phrased to follow "it has…", or null when the set is fine
+ * @param {unknown} value
  */
 export function studySetLimitViolation(value) {
   if (!isValidStudySet(value)) return 'an invalid shape';
@@ -501,7 +611,10 @@ export function studySetLimitViolation(value) {
         textProblem(q.explanation, `${where}'s explanation`, LIMITS.text, { optional: true }) ||
         textProblem(q.source, `${where}'s source`, LIMITS.source, { optional: true }) ||
         flagProblem(q.grounded, `${where}'s grounded flag`) ||
-        (q.accepted ?? []).reduce((found, alt, n) => found || textProblem(alt, `accepted answer ${n + 1} of ${where}`, LIMITS.option), null);
+        (q.accepted ?? []).reduce(
+          (found, alt, n) => found || textProblem(alt, `accepted answer ${n + 1} of ${where}`, LIMITS.option),
+          /** @type {string | null} */ (null)
+        );
       if (problem) return problem;
       continue;
     }
@@ -513,17 +626,32 @@ export function studySetLimitViolation(value) {
       textProblem(q.explanation, `${where}'s explanation`, LIMITS.text, { optional: true }) ||
       textProblem(q.source, `${where}'s source`, LIMITS.source, { optional: true }) ||
       flagProblem(q.grounded, `${where}'s grounded flag`) ||
-      q.options.reduce((found, option, n) => found || textProblem(option, `option ${n + 1} of ${where}`, LIMITS.option), null);
+      q.options.reduce(
+        (found, option, n) => found || textProblem(option, `option ${n + 1} of ${where}`, LIMITS.option),
+        /** @type {string | null} */ (null)
+      );
     if (problem) return problem;
   }
 
   return null;
 }
 
+/**
+ * @param {unknown} value
+ * @param {string} label
+ * @returns {string | null}
+ */
 function flagProblem(value, label) {
   return value === undefined || typeof value === 'boolean' ? null : `a non-boolean value for ${label}`;
 }
 
+/**
+ * @param {unknown} value
+ * @param {string} label
+ * @param {number} max
+ * @param {{optional?: boolean}} [options]
+ * @returns {string | null}
+ */
 function textProblem(value, label, max, { optional = false } = {}) {
   if (value === undefined || value === null) return optional ? null : `no text for ${label}`;
   if (typeof value !== 'string') return `a non-text value for ${label}`;
@@ -531,6 +659,10 @@ function textProblem(value, label, max, { optional = false } = {}) {
   return null;
 }
 
+/**
+ * @param {any} q
+ * @returns {q is QuizQuestion}
+ */
 function isValidQuestion(q) {
   if (!isPlainObject(q) || typeof q.question !== 'string') return false;
   if (q.type === 'blank') {
@@ -554,6 +686,8 @@ function isValidQuestion(q) {
 /**
  * Cheap client-side guard. The server already normalizes, but the client
  * shouldn't trust that a response on the wire matches what it expects.
+ * @param {any} value
+ * @returns {value is StudySet}
  */
 export function isValidStudySet(value) {
   return (

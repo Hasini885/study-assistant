@@ -14,3 +14,7 @@ dist
 test-results/
 playwright-report/
 blob-report/
+
+# Screen recordings stay out of git (they bloat every clone). Host them elsewhere.
+*.mp4
+*.mov
